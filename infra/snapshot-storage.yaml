@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Private lightwalletd snapshot storage and publisher access — immutable timestamped
+  objects are published before a mutable latest manifest.
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+  com.aws.cloudformation.Context:
+    arch: EC2 source host -> private S3; lifecycle bounds retention; latest.json is publish commit point
+    must:
+      - Bucket stays private and TLS-only
+      - Snapshot bucket survives stack deletion or replacement
+    ref:
+      - at: docs/how-snapshots-work.md
+        has: Snapshot consistency, restore, and security model
+        scope: repository
+
+Parameters:
+  PublisherRoleArn:
+    Type: String
+    AllowedPattern: '^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]{1,512}$'
+    Description: Existing EC2 instance role allowed to publish snapshots.
+  SnapshotRetentionDays:
+    Type: Number
+    Default: 14
+    MinValue: 2
+    MaxValue: 365
+    Description: Days to retain timestamped snapshot objects.
+  SnapshotPrefix:
+    Type: String
+    Default: mainnet/v0.5.4
+    AllowedPattern: '^[A-Za-z0-9._/-]+$'
+    Description: S3 key prefix reserved for this publisher.
+
+Resources:
+  SnapshotBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: durable source of published snapshots; Standard class keeps current restore immediately downloadable
+        must:
+          - Never expose bucket directly to public writes or reads
+          - Retain on stack delete/replace; data deletion is a separate operator action
+          - Expire only timestamped snapshots; preserve latest.json
+        mutable: change-with-constraints
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: false
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireTimestampedSnapshots
+            Status: Enabled
+            Prefix: !Sub '${SnapshotPrefix}/snapshots/'
+            ExpirationInDays: !Ref SnapshotRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 2
+          - Id: AbortIncompleteMultipartUploads
+            Status: Enabled
+            Prefix: ''
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: ExpireOldLatestManifestVersions
+            Status: Enabled
+            Prefix: !Sub '${SnapshotPrefix}/latest.json'
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 7
+      Tags:
+        - Key: Project
+          Value: lightwalletd-snapshots
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  SnapshotBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: defense-in-depth transport enforcement for all bucket operations
+        must:
+          - Keep aws:SecureTransport deny for bucket and objects
+    Properties:
+      Bucket: !Ref SnapshotBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt SnapshotBucket.Arn
+              - !Sub '${SnapshotBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: AllowPublisherRole
+            Effect: Allow
+            Principal:
+              AWS: !Ref PublisherRoleArn
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:GetObject
+              - s3:ListMultipartUploadParts
+              - s3:PutObject
+            Resource: !Sub '${SnapshotBucket.Arn}/${SnapshotPrefix}/*'
+
+Outputs:
+  SnapshotBucketName:
+    Description: Private bucket containing snapshot artifacts and latest manifest.
+    Value: !Ref SnapshotBucket
+  SnapshotPrefix:
+    Description: Key prefix granted to the publisher role.
+    Value: !Ref SnapshotPrefix

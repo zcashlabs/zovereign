@@ -1,0 +1,55 @@
+name: Publish daily lightwalletd snapshot
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+      timezone: Australia/Sydney
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lightwalletd-mainnet-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: [self-hosted, linux, x64, lightwalletd-snapshot]
+    timeout-minutes: 180
+    env:
+      AWS_REGION: ap-southeast-2
+      AWS_DEFAULT_REGION: ap-southeast-2
+      CONTAINER_NAME: lightwalletd
+      DATA_DIR: /var/lib/lightwalletd
+      LIGHTWALLETD_VERSION: v0.5.4
+      EXPECTED_IMAGE: docker.io/electriccoinco/lightwalletd:v0.5.4@sha256:a4d4d8593c8c64820cce89daaf1684a7ff8cbefa389268745231a25a4c9b31e9
+      SNAPSHOT_DIR: /srv/lightwalletd/snapshots
+      S3_PREFIX: mainnet/v0.5.4
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Preflight source and storage
+        run: |
+          set -Eeuo pipefail
+          test "$(docker inspect --format '{{.State.Running}}' "$CONTAINER_NAME")" = true
+          test "$(df --output=avail -B1 /srv/lightwalletd | tail -n 1)" -ge 53687091200
+          mkdir -p "$SNAPSHOT_DIR"
+
+      - name: Create consistent snapshot
+        id: create
+        run: ./scripts/create-snapshot.sh "$SNAPSHOT_DIR"
+
+      - name: Publish snapshot to S3
+        env:
+          S3_BUCKET: ${{ vars.SNAPSHOT_BUCKET }}
+          DELETE_LOCAL_AFTER_UPLOAD: '1'
+        run: ./scripts/publish-to-s3.sh "${{ steps.create.outputs.archive_path }}"
+
+      - name: Verify source recovered
+        if: always()
+        run: |
+          test "$(docker inspect --format '{{.State.Running}}' "$CONTAINER_NAME")" = true
+          docker logs --tail 20 "$CONTAINER_NAME"
