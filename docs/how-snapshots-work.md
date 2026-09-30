@@ -1,6 +1,9 @@
 # How lightwalletd snapshots work
 
-This document explains the design and behavior of the v0 snapshot prototype in this repository. It covers what is being saved, why restoring it accelerates startup, how consistency is maintained, how Docker is used during restoration, and what guarantees the prototype does and does not provide.
+This document explains the design and behavior of the snapshot system in this
+repository. It covers what is saved, why restoring it accelerates startup, how
+consistency is maintained, how Docker is used during restoration, and how the
+daily GitHub Actions job publishes artifacts to Amazon S3.
 
 ## 1. What problem the snapshot solves
 
@@ -193,17 +196,23 @@ Waiting for block: 3456961
 
 If `lightwalletd` is waiting for block `N`, it has generally processed through block `N - 1`. This log value is useful operational evidence, but v0 does not use a gRPC call or node RPC query to prove the exact snapshot height.
 
-### Step 5: stop the source for consistency
+### Step 5: quiesce the source for consistency
 
-The script runs:
+For an ordinary persistent container, the script runs:
 
 ```bash
 docker stop lightwalletd
 ```
 
-This is the central consistency mechanism in v0.
+For a supervised container that may be removed or recreated when stopped, set
+`QUIESCE_MODE=pause`; the script then uses `docker pause` and `docker unpause`.
+The deployed daily workflow uses pause mode.
 
-Database files can be internally inconsistent if copied while the process is modifying them. Stopping the container ensures no `lightwalletd` writer changes `/var/lib/lightwalletd` while Docker reads it.
+This is the central consistency mechanism.
+
+Database files can be internally inconsistent if copied while the process is
+modifying them. Stopping or pausing the container ensures no `lightwalletd`
+writer changes `/var/lib/lightwalletd` while Docker reads it.
 
 The tradeoff is source downtime for the duration of the archive stream. In the tested environment:
 
@@ -213,14 +222,15 @@ The tradeoff is source downtime for the duration of the archive stream. In the t
 
 Performance depends on disk speed, CPU, data size, and compressibility.
 
-### Step 6: guarantee restart on failure
+### Step 6: guarantee resume on failure
 
-Immediately after stopping the source, the script records that a restart is required. An `EXIT` trap checks this state.
+Before quiescing the source, the script records that a resume is required. An
+`EXIT` trap checks this state.
 
 If compression fails, the shell receives `SIGINT`, the shell receives `SIGTERM`, or another checked command fails, cleanup:
 
 1. Deletes the partial archive.
-2. Attempts to restart the source container.
+2. Attempts to start or unpause the source container.
 3. Returns the original failure status.
 
 This reduces the chance that an interrupted snapshot operation leaves production stopped. Operators should still monitor the source after running the script because no shell trap can guarantee recovery from host power loss, kernel failure, or `SIGKILL`.
@@ -240,9 +250,10 @@ This streaming design avoids creating both an uncompressed 29 GB tar file and a 
 
 Because `pipefail` is enabled, a failure in either `docker cp` or `zstd` fails the complete operation.
 
-### Step 8: restart production
+### Step 8: resume production
 
-After a non-empty compressed archive exists, the script starts the source container and waits up to 30 seconds for Docker to report it as running.
+After a non-empty compressed archive exists, the script starts or unpauses the
+source container and waits up to 30 seconds for Docker to report it as running.
 
 This confirms container process state, not full gRPC readiness or successful resynchronization. Operators should inspect the source logs after creation:
 
@@ -599,11 +610,27 @@ ss -lnt | grep ':19067'
 
 ## 11. Tested behavior
 
+### Automated AWS publication test
+
+On 2026-09-30, GitHub Actions run `36722157151` executed on the EC2 source host
+and published a `v0.5.4` snapshot to the private S3 bucket:
+
+- Source cache: approximately 25 GB.
+- Compressed archive: 17,311,387,039 bytes (approximately 17 GB).
+- Source pause: 13:30:49Z through 13:35:50Z.
+- S3 multipart upload: 13:41:04Z through 13:43:27Z.
+- SHA-256: `4ebc4e7da55b149393ba52519ad4fc7292534e81a9e9e137bec1ec90b7cc4645`.
+- The archive, checksum, info file, and `latest.json` were verified in S3.
+- The local archive was removed only after successful publication.
+- The production container was confirmed running and unpaused afterward.
+
+The earlier prototype evidence below predates the AWS automation.
+
 The prototype was exercised entirely on the remote Docker host, not on the development workstation.
 
 ### Snapshot creation test
 
-- Source image: `electriccoinco/lightwalletd:v0.5.4`.
+- Source image: `electriccoinco/lightwalletd:v0.5.3`.
 - Source database: approximately 29 GB.
 - Archive: approximately 23 GB.
 - Source cache at creation: 3,456,961 blocks.
@@ -628,9 +655,9 @@ All temporary test containers, test volumes, and the temporary HTTP service were
 
 ### What v0 guarantees
 
-- The source `lightwalletd` process is stopped while the archive stream is produced.
+- The source `lightwalletd` process is stopped or paused while the archive stream is produced.
 - A failed pipeline does not publish the temporary file under the final archive name.
-- Cleanup attempts to restart a source stopped by the script.
+- Cleanup attempts to start or unpause a source quiesced by the script.
 - SHA-256 detects accidental artifact changes when the sidecar is present and trusted.
 - Zstandard integrity is tested before extraction.
 - Restoration goes into a new Docker volume by default.

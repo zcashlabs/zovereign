@@ -1,5 +1,10 @@
 # Lightwalletd Snapshots — v0 Prototype Plan
 
+> Status: the two-command v0 was completed, and daily publication to a private
+> Amazon S3 bucket is now automated by a GitHub Actions self-hosted runner. The
+> AWS automation is documented in `README.md`; this file retains the original
+> prototype scope and acceptance criteria.
+
 ## Goal
 
 Prove the complete idea with two shell commands:
@@ -224,9 +229,7 @@ The v0 experiment succeeds when the following can be demonstrated:
 
 ## Explicitly deferred until after v0
 
-- Scheduled snapshots
-- Automatic uploads
-- S3/CDN integration
+- Public CDN distribution
 - Signed manifests
 - Snapshot catalogs and `latest.json`
 - Multiple versions or networks

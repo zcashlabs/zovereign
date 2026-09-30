@@ -91,6 +91,7 @@ else
   exit 1
 fi
 
+NEEDS_RESUME=1
 if [[ "$ACTIVE_QUIESCE_MODE" == "pause" ]]; then
   echo "Pausing $CONTAINER_NAME to create a consistent snapshot..."
   docker pause "$CONTAINER_NAME" >/dev/null
@@ -98,7 +99,6 @@ else
   echo "Stopping $CONTAINER_NAME to create a consistent snapshot..."
   docker stop "$CONTAINER_NAME" >/dev/null
 fi
-NEEDS_RESUME=1
 
 echo "Archiving $DATA_DIR to $ARCHIVE_PATH..."
 docker cp "$CONTAINER_NAME:$DATA_DIR/." - \

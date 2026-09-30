@@ -3,7 +3,6 @@ name: Publish daily lightwalletd snapshot
 on:
   schedule:
     - cron: '17 2 * * *'
-      timezone: Australia/Sydney
   workflow_dispatch:
 
 permissions:
