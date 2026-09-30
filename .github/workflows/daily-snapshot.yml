@@ -24,6 +24,7 @@ jobs:
       DATA_DIR: /var/lib/lightwalletd
       LIGHTWALLETD_VERSION: v0.5.4
       EXPECTED_IMAGE: docker.io/electriccoinco/lightwalletd:v0.5.4@sha256:a4d4d8593c8c64820cce89daaf1684a7ff8cbefa389268745231a25a4c9b31e9
+      QUIESCE_MODE: pause
       SNAPSHOT_DIR: /srv/lightwalletd/snapshots
       S3_PREFIX: mainnet/v0.5.4
 
