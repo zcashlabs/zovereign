@@ -33,7 +33,10 @@ sudo \
   ./scripts/create-snapshot.sh ./snapshots
 ```
 
-The source container is stopped while its database is archived to guarantee consistency. A cleanup trap restarts it if creation succeeds, fails, or is interrupted.
+The source container is quiesced while its database is archived to guarantee
+consistency. Persistent containers are stopped; auto-remove containers are
+paused so Docker does not delete them. A cleanup trap resumes the source if
+creation succeeds, fails, or is interrupted.
 
 The command creates:
 
