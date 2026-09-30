@@ -1,15 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  Private lightwalletd snapshot storage and publisher access — immutable timestamped
-  objects are published before a mutable latest manifest.
+  Private lightwalletd snapshot storage with public CloudFront downloads — immutable
+  timestamped objects are published before a mutable latest manifest.
 
 Metadata:
   AWSToolsMetrics:
     AWSAgentToolkit: aws-cloudformation@3
   com.aws.cloudformation.Context:
-    arch: EC2 source host -> private S3; lifecycle bounds retention; latest.json is publish commit point
+    arch: EC2 source host -> private S3 -> public CloudFront; lifecycle bounds retention; latest.json is publish commit point
     must:
       - Bucket stays private and TLS-only
+      - Public reads reach S3 only through the stack CloudFront distribution
       - Snapshot bucket survives stack deletion or replacement
     ref:
       - at: docs/how-snapshots-work.md
@@ -118,6 +119,84 @@ Resources:
               - s3:ListMultipartUploadParts
               - s3:PutObject
             Resource: !Sub '${SnapshotBucket.Arn}/${SnapshotPrefix}/*'
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${SnapshotBucket.Arn}/${SnapshotPrefix}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SnapshotDistribution}'
+
+  SnapshotOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: authenticate CloudFront origin reads while S3 Block Public Access stays enabled
+        must:
+          - Sign every origin request with SigV4
+        mutable: change-with-constraints
+    Properties:
+      OriginAccessControlConfig:
+        Description: Read-only access from the snapshot CloudFront distribution to private S3
+        Name: !Sub '${AWS::StackName}-snapshots'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SnapshotDistribution:
+    Type: AWS::CloudFront::Distribution
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: stable HTTPS download endpoint; cache immutable archives while always revalidating latest.json
+        must:
+          - Use OAC; never make the S3 origin public
+          - latest.json must use the disabled-cache behavior
+          - Only GET, HEAD, and OPTIONS are viewer-accessible
+        mutable: change-with-constraints
+    Properties:
+      DistributionConfig:
+        Comment: Public lightwalletd snapshot downloads
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        Origins:
+          - DomainName: !GetAtt SnapshotBucket.RegionalDomainName
+            Id: SnapshotS3Origin
+            OriginAccessControlId: !GetAtt SnapshotOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          Compress: false
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+          TargetOriginId: SnapshotS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        CacheBehaviors:
+          - PathPattern: !Sub '${SnapshotPrefix}/latest.json'
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            CachedMethods:
+              - GET
+              - HEAD
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            Compress: true
+            ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+            TargetOriginId: SnapshotS3Origin
+            ViewerProtocolPolicy: redirect-to-https
+        PriceClass: PriceClass_200
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
 
 Outputs:
   SnapshotBucketName:
@@ -126,3 +205,9 @@ Outputs:
   SnapshotPrefix:
     Description: Key prefix granted to the publisher role.
     Value: !Ref SnapshotPrefix
+  SnapshotDownloadDomain:
+    Description: Public HTTPS domain for snapshot manifests and artifacts.
+    Value: !GetAtt SnapshotDistribution.DomainName
+  LatestManifestUrl:
+    Description: Public URL for the current snapshot manifest.
+    Value: !Sub 'https://${SnapshotDistribution.DomainName}/${SnapshotPrefix}/latest.json'

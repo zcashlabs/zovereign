@@ -134,6 +134,40 @@ sudo \
   s3://BUCKET/mainnet/v0.5.4/snapshots/TIMESTAMP/snapshot.tar.zst
 ```
 
-S3 remains private. The AWS CLI on the publishing and restore hosts must use an
-instance role or another short-lived identity authorized for the snapshot key
-prefix.
+S3 remains private. Publishing and direct S3 restores require an instance role
+or another short-lived identity authorized for the snapshot key prefix. Public
+downloads are served only through the stack's CloudFront distribution.
+
+Discover and download the latest public snapshot with resumable transfers:
+
+```bash
+BASE_URL="https://d2t6ule2qr31fe.cloudfront.net"
+PREFIX="mainnet/v0.5.4"
+
+curl -fsSL "$BASE_URL/$PREFIX/latest.json" -o latest.json
+SNAPSHOT_KEY="$(jq -r '.snapshot_key' latest.json)"
+CHECKSUM_KEY="$(jq -r '.checksum_key' latest.json)"
+EXPECTED_SHA256="$(jq -r '.sha256' latest.json)"
+
+curl -fL --continue-at - "$BASE_URL/$SNAPSHOT_KEY" -o snapshot.tar.zst
+curl -fsSL "$BASE_URL/$CHECKSUM_KEY" -o snapshot.tar.zst.sha256
+SIDECAR_SHA256="$(awk 'NR == 1 {print $1}' snapshot.tar.zst.sha256)"
+test "$SIDECAR_SHA256" = "$EXPECTED_SHA256"
+printf '%s  snapshot.tar.zst\n' "$EXPECTED_SHA256" | sha256sum --check
+```
+
+The deployment also exposes this host as the `SnapshotDownloadDomain`
+CloudFormation output. Timestamped archives are immutable and cacheable;
+`latest.json` is deliberately not cached.
+
+The restore script accepts an archive URL directly and automatically retrieves
+its checksum sidecar:
+
+```bash
+sudo \
+  RPC_HOST=zakura \
+  RPC_PASSWORD='replace-me' \
+  DOCKER_NETWORK=zakura_default \
+  ./scripts/start-from-snapshot.sh \
+  "https://d2t6ule2qr31fe.cloudfront.net/$SNAPSHOT_KEY"
+```

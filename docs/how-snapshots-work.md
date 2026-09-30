@@ -29,7 +29,10 @@ flowchart TD
     D1 -->|docker cp tar stream| T[tar stream]
     T -->|zstd compression| A[snapshot.tar.zst]
     A --> H[SHA-256 sidecar]
-    A -->|local file or HTTP| R[Restore script]
+    A -->|daily publisher| S3[Private Amazon S3]
+    S3 -->|signed origin request| CF[Public CloudFront endpoint]
+    CF -->|HTTPS + resumable ranges| R[Restore script]
+    A -->|local file| R
     H --> R
     R -->|zstd decompression| T2[tar stream]
     T2 -->|docker cp extraction| V[New Docker volume]
@@ -621,6 +624,11 @@ and published a `v0.5.4` snapshot to the private S3 bucket:
 - S3 multipart upload: 13:41:04Z through 13:43:27Z.
 - SHA-256: `4ebc4e7da55b149393ba52519ad4fc7292534e81a9e9e137bec1ec90b7cc4645`.
 - The archive, checksum, info file, and `latest.json` were verified in S3.
+- CloudFront serves the manifest and artifacts while anonymous direct S3 reads
+  remain denied; a 1 KiB archive range returned HTTP 206 with the correct total
+  object size.
+- Public manifest:
+  `https://d2t6ule2qr31fe.cloudfront.net/mainnet/v0.5.4/latest.json`.
 - The local archive was removed only after successful publication.
 - The production container was confirmed running and unpaused afterward.
 
