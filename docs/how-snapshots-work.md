@@ -359,6 +359,13 @@ It then requests the checksum from:
 
 The download currently does not use `curl --continue-at`, so an interrupted v0 download starts over on the next run. Resumable downloading is a future improvement.
 
+For an authenticated `s3://` source, the script first creates its temporary
+directory and installs cleanup, then downloads the archive and `.sha256`
+sidecar with `aws s3 cp`. Both downloads must succeed. S3, HTTP(S), and local
+files are mutually exclusive acquisition paths; downloaded paths are retained
+through the shared validation and extraction steps. An inherited `WORK_DIR`
+is never used or removed.
+
 If an HTTP checksum sidecar is unavailable, v0 prints a warning and continues. For a trusted operational workflow, always publish and require the checksum sidecar.
 
 ### Step 3: verify integrity
@@ -425,7 +432,18 @@ Zstandard emits the original tar stream. `docker cp` reads tar data from standar
 
 The archive is not first expanded into a second host-side directory. This reduces temporary disk requirements.
 
-After extraction, the helper container is removed.
+After extraction, the helper container is removed. It is also covered by the
+permanent `EXIT` cleanup if either pipeline command fails or a signal
+interrupts restoration. Helpers and the validation container are removed
+before attempting to remove the new volume.
+
+New resources carry a unique restore-attempt label. Container cleanup selects
+that attempt and role and removes the returned IDs, including containers whose
+Docker command created them but failed before returning successfully. The new
+volume's label is checked before extraction. A same-name resource belonging to
+another attempt is not adopted or removed by cleanup. This does not guarantee
+recovery after host failure, `SIGKILL`, or an unavailable Docker daemon;
+cleanup errors are printed and the command returns nonzero.
 
 ### Step 7: structural database check
 
@@ -491,19 +509,25 @@ A reachable TCP port means the listener opened; it is not a complete gRPC applic
 
 ### Step 10: preserve success or clean up failure
 
-The restore script tracks whether it created the volume and final container.
+The restore script tracks creation attempts and labels its new resources with
+an invocation-specific owner and container role.
 
 Before successful readiness:
 
-- A failed operation removes the newly created container.
-- A failed operation removes the newly created volume.
+- Cleanup removes owned extraction/validation helpers first, then the failed
+  final container, then the newly created volume.
 - The temporary download directory is removed.
+- Removal failures are reported while remaining cleanup steps are attempted.
 
 After successful readiness:
 
 - The final container and volume are retained.
-- Temporary downloaded files are removed.
+- Temporary containers and downloaded files are removed.
 - Recent logs and the follow command are printed.
+
+Cleanup preserves an original nonzero failure or signal status. A cleanup
+failure after successful startup returns nonzero without deleting the running
+restored instance.
 
 For a local source path, the original snapshot is never removed.
 
@@ -764,7 +788,11 @@ Restore stops before creating the volume. The archive is truncated or corrupt.
 
 ### Extraction fails
 
-The temporary helper is removed by its signal cleanup, and the main failure cleanup removes the newly created volume.
+The permanent EXIT cleanup removes the owned temporary helper before its new
+volume, whether extraction failed normally or was interrupted. If Docker cannot
+remove a resource, cleanup reports that failure rather than silently claiming
+the resource was removed. A retry is safe after cleanup succeeds; unresolved
+cleanup errors require inspection before reusing the target names.
 
 ### Expected database files are missing
 
