@@ -138,6 +138,12 @@ S3 remains private. Publishing and direct S3 restores require an instance role
 or another short-lived identity authorized for the snapshot key prefix. Public
 downloads are served only through the stack's CloudFront distribution.
 
+S3 restores require both the archive and its `.sha256` sidecar. Each restore
+uses its own temporary download directory. If restoration fails or is
+interrupted, cleanup removes its temporary containers before its new volume;
+cleanup errors are reported rather than hidden. Existing targets are still
+protected unless `FORCE=1` explicitly authorizes removing them.
+
 Discover and download the latest public snapshot with resumable transfers:
 
 ```bash
@@ -171,3 +177,32 @@ sudo \
   ./scripts/start-from-snapshot.sh \
   "https://d2t6ule2qr31fe.cloudfront.net/$SNAPSHOT_KEY"
 ```
+
+## Local regression tests
+
+The restore tests require Python 3, Bash, Zstandard and `sha256sum`:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+bash -n scripts/start-from-snapshot.sh
+```
+
+They run the real restore script with inert Docker, AWS and curl commands,
+tiny archives, and a loopback-only TCP readiness listener. They make no cloud
+or blockchain requests and do not need a Docker daemon.
+
+An optional real-Docker smoke test exercises extraction, cleanup and retry,
+using synthetic cache files and a TCP-listener fixture, not lightwalletd:
+
+```bash
+python3 tests/docker_smoke.py \
+  --base-image YOUR_CACHED_IMAGE_WITH_SH_TAR_AND_OPENSSL \
+  --output /tmp/zovereign-restore-smoke
+```
+
+The base image must already be cached. The test builds a small local fixture
+image without package installation, uses a test-only loopback port binding,
+and removes only its labelled resources. It stops before starting a new case
+if less than 45 GiB is free. S3 downloads remain simulated; HTTP uses a local
+server. These checks do not establish real-cache compatibility, chain catch-up
+or AWS authorization.
