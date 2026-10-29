@@ -22,11 +22,11 @@ jobs:
       AWS_DEFAULT_REGION: us-east-1
       CONTAINER_NAME: lightwalletd
       DATA_DIR: /var/lib/lightwalletd
-      LIGHTWALLETD_VERSION: v0.5.4
-      EXPECTED_IMAGE: docker.io/electriccoinco/lightwalletd:v0.5.4@sha256:a4d4d8593c8c64820cce89daaf1684a7ff8cbefa389268745231a25a4c9b31e9
+      LIGHTWALLETD_VERSION: v0.6.0
+      EXPECTED_IMAGE: electriccoinco/lightwalletd:v0.6.0@sha256:abc8199dae800e050415a3459f71c7850aeefeb1ca6a681e9b9eda7249ce8613
       QUIESCE_MODE: pause
       SNAPSHOT_DIR: /srv/lightwalletd/snapshots
-      S3_PREFIX: mainnet/v0.5.4
+      S3_PREFIX: mainnet/v0.6.0
       S3_ENDPOINT_URL: ${{ vars.SPACES_ENDPOINT }}
 
     steps:

@@ -1,0 +1,51 @@
+services:
+  zakura:
+    container_name: zakura
+    image: zakuracore/zakura:1.7.0@sha256:cf3b2d09a0ab3cd3a5e17cbbb676b7abe719607391402ea07d6402e9af897b6b
+    restart: unless-stopped
+    environment:
+      ZAKURA_NETWORK__NETWORK: Mainnet
+      ZAKURA_NETWORK__LISTEN_ADDR: 0.0.0.0:8233
+      ZAKURA_RPC__LISTEN_ADDR: 0.0.0.0:8232
+      ZAKURA_RPC__ENABLE_COOKIE_AUTH: "false"
+      ZAKURA_STATE__CACHE_DIR: /home/zebra/.cache/zakura
+    volumes:
+      - /srv/lightwalletd/zakura:/home/zebra/.cache/zakura
+    ports:
+      - "8233:8233"
+    networks:
+      - node
+
+  lightwalletd:
+    container_name: lightwalletd
+    image: electriccoinco/lightwalletd:v0.6.0@sha256:abc8199dae800e050415a3459f71c7850aeefeb1ca6a681e9b9eda7249ce8613
+    restart: unless-stopped
+    depends_on:
+      - zakura
+    command:
+      - --no-tls-very-insecure
+      - --grpc-bind-addr=0.0.0.0:9067
+      - --http-bind-addr=0.0.0.0:9068
+      - --zcash-conf-path=/etc/lightwalletd/zcash.conf
+      - --data-dir=/var/lib/lightwalletd
+      - --log-file=/dev/stdout
+      - --log-level=7
+    configs:
+      - source: lightwalletd_zcash_conf
+        target: /etc/lightwalletd/zcash.conf
+    volumes:
+      - /srv/lightwalletd/lightwalletd:/var/lib/lightwalletd
+    networks:
+      - node
+
+configs:
+  lightwalletd_zcash_conf:
+    content: |
+      rpcbind=zakura
+      rpcport=8232
+      rpcpassword=none
+
+networks:
+  node:
+    name: zakura_default
+

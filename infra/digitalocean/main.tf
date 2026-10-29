@@ -1,6 +1,6 @@
 locals {
   name            = "lightwalletd-snapshots"
-  snapshot_prefix = "mainnet/v0.5.4"
+  snapshot_prefix = "mainnet/v0.6.0"
   common_tags     = ["lightwalletd-snapshots", "mainnet", "managed-by-opentofu"]
 }
 

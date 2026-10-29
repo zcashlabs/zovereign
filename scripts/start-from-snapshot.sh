@@ -10,7 +10,7 @@ fi
 SNAPSHOT_SOURCE="$1"
 CONTAINER_NAME="${CONTAINER_NAME:-lightwalletd}"
 VOLUME_NAME="${VOLUME_NAME:-lightwalletd-data}"
-IMAGE="${IMAGE:-electriccoinco/lightwalletd:v0.5.4}"
+IMAGE="${IMAGE:-electriccoinco/lightwalletd:v0.6.0}"
 DATA_DIR="${DATA_DIR:-/var/lib/lightwalletd}"
 DOCKER_NETWORK="${DOCKER_NETWORK:-}"
 GRPC_PORT="${GRPC_PORT:-9067}"

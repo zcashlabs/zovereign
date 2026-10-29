@@ -9,7 +9,8 @@ fi
 
 ARCHIVE_PATH="$(realpath "$1")"
 S3_BUCKET="${S3_BUCKET:-}"
-S3_PREFIX="${S3_PREFIX:-mainnet/v0.5.4}"
+S3_PREFIX="${S3_PREFIX:-mainnet/v0.6.0}"
+LIGHTWALLETD_VERSION="${LIGHTWALLETD_VERSION:-v0.6.0}"
 S3_ENDPOINT_URL="${S3_ENDPOINT_URL:-}"
 S3_PUBLIC_READ="${S3_PUBLIC_READ:-0}"
 DELETE_LOCAL_AFTER_UPLOAD="${DELETE_LOCAL_AFTER_UPLOAD:-0}"
@@ -100,7 +101,7 @@ cat > "$MANIFEST_PATH" <<EOF
 {
   "format_version": 1,
   "network": "mainnet",
-  "lightwalletd_version": "v0.5.4",
+  "lightwalletd_version": "$LIGHTWALLETD_VERSION",
   "created_at": "$TIMESTAMP",
   "snapshot_key": "$ARCHIVE_KEY",
   "checksum_key": "$CHECKSUM_KEY",
