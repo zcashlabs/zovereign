@@ -17,8 +17,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, lightwalletd-snapshot]
     timeout-minutes: 180
     env:
-      AWS_REGION: ap-southeast-2
-      AWS_DEFAULT_REGION: ap-southeast-2
+      AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
       CONTAINER_NAME: lightwalletd
       DATA_DIR: /var/lib/lightwalletd
       LIGHTWALLETD_VERSION: v0.5.4
@@ -26,6 +27,7 @@ jobs:
       QUIESCE_MODE: pause
       SNAPSHOT_DIR: /srv/lightwalletd/snapshots
       S3_PREFIX: mainnet/v0.5.4
+      S3_ENDPOINT_URL: ${{ vars.SPACES_ENDPOINT }}
 
     steps:
       - name: Check out repository
@@ -42,9 +44,10 @@ jobs:
         id: create
         run: ./scripts/create-snapshot.sh "$SNAPSHOT_DIR"
 
-      - name: Publish snapshot to S3
+      - name: Publish snapshot to DigitalOcean Spaces
         env:
-          S3_BUCKET: ${{ vars.SNAPSHOT_BUCKET }}
+          S3_BUCKET: ${{ vars.SPACES_BUCKET }}
+          S3_PUBLIC_READ: '1'
           DELETE_LOCAL_AFTER_UPLOAD: '1'
         run: ./scripts/publish-to-s3.sh "${{ steps.create.outputs.archive_path }}"
 

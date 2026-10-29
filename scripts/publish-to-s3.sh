@@ -10,6 +10,8 @@ fi
 ARCHIVE_PATH="$(realpath "$1")"
 S3_BUCKET="${S3_BUCKET:-}"
 S3_PREFIX="${S3_PREFIX:-mainnet/v0.5.4}"
+S3_ENDPOINT_URL="${S3_ENDPOINT_URL:-}"
+S3_PUBLIC_READ="${S3_PUBLIC_READ:-0}"
 DELETE_LOCAL_AFTER_UPLOAD="${DELETE_LOCAL_AFTER_UPLOAD:-0}"
 
 for command_name in aws sha256sum stat mktemp; do
@@ -22,6 +24,16 @@ done
 if [[ -z "$S3_BUCKET" ]]; then
   echo "error: S3_BUCKET is required" >&2
   exit 1
+fi
+
+AWS_ENDPOINT_ARGS=()
+if [[ -n "$S3_ENDPOINT_URL" ]]; then
+  AWS_ENDPOINT_ARGS+=(--endpoint-url "$S3_ENDPOINT_URL")
+fi
+
+AWS_UPLOAD_ARGS=()
+if [[ "$S3_PUBLIC_READ" == "1" ]]; then
+  AWS_UPLOAD_ARGS+=(--acl public-read)
 fi
 
 if [[ ! -s "$ARCHIVE_PATH" ]]; then
@@ -60,19 +72,22 @@ INFO_KEY="${ARCHIVE_KEY}.info"
 LATEST_KEY="${S3_PREFIX%/}/latest.json"
 
 echo "Uploading snapshot to s3://$S3_BUCKET/$ARCHIVE_KEY..."
-aws s3 cp --only-show-errors "$ARCHIVE_PATH" "s3://$S3_BUCKET/$ARCHIVE_KEY" \
+aws "${AWS_ENDPOINT_ARGS[@]}" s3 cp --only-show-errors "$ARCHIVE_PATH" "s3://$S3_BUCKET/$ARCHIVE_KEY" \
+  "${AWS_UPLOAD_ARGS[@]}" \
   --content-type application/zstd \
   --cache-control 'public,max-age=31536000,immutable'
-aws s3 cp --only-show-errors "$CHECKSUM_PATH" "s3://$S3_BUCKET/$CHECKSUM_KEY" \
+aws "${AWS_ENDPOINT_ARGS[@]}" s3 cp --only-show-errors "$CHECKSUM_PATH" "s3://$S3_BUCKET/$CHECKSUM_KEY" \
+  "${AWS_UPLOAD_ARGS[@]}" \
   --content-type text/plain \
   --cache-control 'public,max-age=31536000,immutable'
-aws s3 cp --only-show-errors "$INFO_PATH" "s3://$S3_BUCKET/$INFO_KEY" \
+aws "${AWS_ENDPOINT_ARGS[@]}" s3 cp --only-show-errors "$INFO_PATH" "s3://$S3_BUCKET/$INFO_KEY" \
+  "${AWS_UPLOAD_ARGS[@]}" \
   --content-type text/plain \
   --cache-control 'public,max-age=31536000,immutable'
 
-aws s3api head-object --bucket "$S3_BUCKET" --key "$ARCHIVE_KEY" >/dev/null
-aws s3api head-object --bucket "$S3_BUCKET" --key "$CHECKSUM_KEY" >/dev/null
-aws s3api head-object --bucket "$S3_BUCKET" --key "$INFO_KEY" >/dev/null
+aws "${AWS_ENDPOINT_ARGS[@]}" s3api head-object --bucket "$S3_BUCKET" --key "$ARCHIVE_KEY" >/dev/null
+aws "${AWS_ENDPOINT_ARGS[@]}" s3api head-object --bucket "$S3_BUCKET" --key "$CHECKSUM_KEY" >/dev/null
+aws "${AWS_ENDPOINT_ARGS[@]}" s3api head-object --bucket "$S3_BUCKET" --key "$INFO_KEY" >/dev/null
 
 MANIFEST_PATH="$(mktemp)"
 cleanup() {
@@ -96,7 +111,8 @@ cat > "$MANIFEST_PATH" <<EOF
 EOF
 
 # Publishing latest.json last makes it the commit point for consumers.
-aws s3 cp --only-show-errors "$MANIFEST_PATH" "s3://$S3_BUCKET/$LATEST_KEY" \
+aws "${AWS_ENDPOINT_ARGS[@]}" s3 cp --only-show-errors "$MANIFEST_PATH" "s3://$S3_BUCKET/$LATEST_KEY" \
+  "${AWS_UPLOAD_ARGS[@]}" \
   --content-type application/json \
   --cache-control 'no-cache,max-age=0'
 

@@ -5,24 +5,28 @@ set -Eeuo pipefail
 RUNNER_VERSION="${RUNNER_VERSION:-2.337.0}"
 RUNNER_SHA256="${RUNNER_SHA256:-70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613}"
 RUNNER_URL="${RUNNER_URL:-https://github.com/zcashlabs/zovereign}"
-RUNNER_NAME="${RUNNER_NAME:-lightwalletd-mainnet-apse2-1}"
+RUNNER_NAME="${RUNNER_NAME:-lightwalletd-mainnet-blr1-1}"
 RUNNER_LABELS="${RUNNER_LABELS:-lightwalletd-snapshot}"
 RUNNER_USER="${RUNNER_USER:-github-runner}"
 RUNNER_DIR="${RUNNER_DIR:-/opt/actions-runner}"
-TOKEN_PARAMETER="${TOKEN_PARAMETER:-/lightwalletd-snapshots/github-runner-registration-token}"
-AWS_REGION="${AWS_REGION:-ap-southeast-2}"
+RUNNER_TOKEN="${RUNNER_TOKEN:-}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "error: this installer must run as root" >&2
   exit 1
 fi
 
-for command_name in aws curl dnf sha256sum tar useradd usermod; do
+for command_name in curl sha256sum tar useradd usermod; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "error: required command not found: $command_name" >&2
     exit 1
   fi
 done
+
+if [[ -z "$RUNNER_TOKEN" ]]; then
+  echo "error: RUNNER_TOKEN is required" >&2
+  exit 1
+fi
 
 if [[ -e "$RUNNER_DIR/.runner" ]]; then
   echo "error: a GitHub Actions runner is already configured in $RUNNER_DIR" >&2
@@ -46,16 +50,16 @@ tar --extract --gzip --file "$ARCHIVE" --directory "$RUNNER_DIR"
 rm -f "$ARCHIVE"
 chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR"
 
-# Amazon Linux 2023 is Fedora-compatible but is not recognized by the runner's
-# distro detection. Install GitHub's documented Fedora/RHEL dependency set.
-dnf install -y lttng-ust openssl-libs krb5-libs zlib libicu
-
-RUNNER_TOKEN="$(aws ssm get-parameter \
-  --region "$AWS_REGION" \
-  --name "$TOKEN_PARAMETER" \
-  --with-decryption \
-  --query 'Parameter.Value' \
-  --output text)"
+if command -v apt-get >/dev/null 2>&1; then
+  "$RUNNER_DIR/bin/installdependencies.sh"
+elif command -v dnf >/dev/null 2>&1; then
+  # Amazon Linux 2023 is Fedora-compatible but is not recognized by the
+  # runner's distro detection.
+  dnf install -y lttng-ust openssl-libs krb5-libs zlib libicu
+else
+  echo "error: supported package manager not found (apt-get or dnf)" >&2
+  exit 1
+fi
 
 (
   cd "$RUNNER_DIR"

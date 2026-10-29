@@ -22,9 +22,22 @@ tofu plan -out=migration.tfplan
 tofu show migration.tfplan
 ```
 
-The initial plan keeps `enable_spaces = false`. After creating a Space-scoped
-key, export `TF_VAR_spaces_access_id` and `TF_VAR_spaces_secret_key`, set
-`TF_VAR_enable_spaces=true`, and generate a second plan.
+The initial plan keeps `enable_spaces = false`. A new DigitalOcean account may
+need its first Standard Space created once in the control panel to initialize
+the Spaces subscription. Create `zcashlabs-lightwalletd-snapshots` in `blr1`
+without a CDN, then import it before enabling Spaces in this stack:
+
+```bash
+export TF_VAR_enable_spaces=true
+export TF_VAR_spaces_access_id='...'
+export TF_VAR_spaces_secret_key='...'
+tofu import 'digitalocean_spaces_bucket.snapshots[0]' \
+  blr1,zcashlabs-lightwalletd-snapshots
+tofu plan -out=spaces.tfplan
+```
+
+The subsequent apply configures versioning, retention, public snapshot reads,
+and the CDN. The publisher key should then be narrowed to this Space only.
 
 Applying the stack creates billable resources. Do not apply a plan without
 reviewing the selected region, Droplet size, volume size, Space name, and SSH

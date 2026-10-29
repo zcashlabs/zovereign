@@ -20,6 +20,35 @@ RPC_USER="${RPC_USER:-lightwalletd}"
 RPC_PASSWORD="${RPC_PASSWORD:-}"
 START_TIMEOUT="${START_TIMEOUT:-60}"
 FORCE="${FORCE:-0}"
+S3_ENDPOINT_URL="${S3_ENDPOINT_URL:-}"
+
+WORK_DIR="$(mktemp -d)"
+ARCHIVE_PATH=""
+CHECKSUM_PATH=""
+VOLUME_CREATED=0
+CONTAINER_CREATED=0
+SUCCESS=0
+
+cleanup() {
+  local exit_code=$?
+  trap - EXIT
+
+  rm -rf "$WORK_DIR"
+
+  if [[ "$SUCCESS" != "1" ]]; then
+    if [[ "$CONTAINER_CREATED" == "1" ]]; then
+      docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    fi
+    if [[ "$VOLUME_CREATED" == "1" ]]; then
+      docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  exit "$exit_code"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 for command_name in docker zstd sha256sum awk mktemp; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -34,13 +63,17 @@ if [[ "$SNAPSHOT_SOURCE" == s3://* ]] && ! command -v aws >/dev/null 2>&1; then
 fi
 
 if [[ "$SNAPSHOT_SOURCE" == s3://* ]]; then
+  AWS_ENDPOINT_ARGS=()
+  if [[ -n "$S3_ENDPOINT_URL" ]]; then
+    AWS_ENDPOINT_ARGS+=(--endpoint-url "$S3_ENDPOINT_URL")
+  fi
   ARCHIVE_NAME="${SNAPSHOT_SOURCE##*/}"
   ARCHIVE_PATH="$WORK_DIR/$ARCHIVE_NAME"
   CHECKSUM_PATH="$WORK_DIR/$ARCHIVE_NAME.sha256"
 
   echo "Downloading snapshot from S3..."
-  aws s3 cp --only-show-errors "$SNAPSHOT_SOURCE" "$ARCHIVE_PATH"
-  aws s3 cp --only-show-errors "${SNAPSHOT_SOURCE}.sha256" "$CHECKSUM_PATH"
+  aws "${AWS_ENDPOINT_ARGS[@]}" s3 cp --only-show-errors "$SNAPSHOT_SOURCE" "$ARCHIVE_PATH"
+  aws "${AWS_ENDPOINT_ARGS[@]}" s3 cp --only-show-errors "${SNAPSHOT_SOURCE}.sha256" "$CHECKSUM_PATH"
 elif [[ "$SNAPSHOT_SOURCE" == http://* || "$SNAPSHOT_SOURCE" == https://* ]]; then
   if ! command -v curl >/dev/null 2>&1; then
     echo "error: required command not found for URL download: curl" >&2
@@ -77,34 +110,6 @@ if docker volume inspect "$VOLUME_NAME" >/dev/null 2>&1; then
   echo "Removing existing volume $VOLUME_NAME because FORCE=1..."
   docker volume rm "$VOLUME_NAME" >/dev/null
 fi
-
-WORK_DIR="$(mktemp -d)"
-ARCHIVE_PATH=""
-CHECKSUM_PATH=""
-VOLUME_CREATED=0
-CONTAINER_CREATED=0
-SUCCESS=0
-
-cleanup() {
-  local exit_code=$?
-  trap - EXIT
-
-  rm -rf "$WORK_DIR"
-
-  if [[ "$SUCCESS" != "1" ]]; then
-    if [[ "$CONTAINER_CREATED" == "1" ]]; then
-      docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-    fi
-    if [[ "$VOLUME_CREATED" == "1" ]]; then
-      docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
-    fi
-  fi
-
-  exit "$exit_code"
-}
-trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
 
 if [[ "$SNAPSHOT_SOURCE" == http://* || "$SNAPSHOT_SOURCE" == https://* ]]; then
   SOURCE_WITHOUT_QUERY="${SNAPSHOT_SOURCE%%\?*}"
