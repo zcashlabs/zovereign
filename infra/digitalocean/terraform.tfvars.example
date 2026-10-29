@@ -1,0 +1,9 @@
+region          = "blr1"
+droplet_size    = "g-4vcpu-16gb"
+volume_size_gib = 500
+admin_cidrs     = ["203.0.113.10/32"]
+space_name      = "replace-with-a-globally-unique-space-name"
+
+# Enable only after a Spaces key has been created and exported through
+# TF_VAR_spaces_access_id and TF_VAR_spaces_secret_key.
+enable_spaces = false

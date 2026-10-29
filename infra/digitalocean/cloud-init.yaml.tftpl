@@ -1,0 +1,44 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - docker.io
+  - jq
+  - xfsprogs
+  - zstd
+
+write_files:
+  - path: /usr/local/sbin/mount-lightwalletd-volume
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      device="/dev/disk/by-id/scsi-0DO_Volume_${volume_name}"
+      for _ in $(seq 1 60); do
+        [[ -b "$device" ]] && break
+        sleep 2
+      done
+      [[ -b "$device" ]]
+      mkdir -p /srv/lightwalletd
+      if ! blkid "$device" >/dev/null 2>&1; then
+        mkfs.xfs -f "$device"
+      fi
+      uuid="$(blkid -s UUID -o value "$device")"
+      grep -q "UUID=$uuid " /etc/fstab || printf 'UUID=%s /srv/lightwalletd xfs defaults,nofail,discard 0 2\n' "$uuid" >> /etc/fstab
+      mount /srv/lightwalletd || mount -a
+      mkdir -p /srv/lightwalletd/{lightwalletd,snapshots,zakura}
+
+runcmd:
+  - systemctl enable --now docker
+  - /usr/local/sbin/mount-lightwalletd-volume
+  - useradd --create-home --shell /bin/bash github-runner
+  - usermod -aG docker github-runner
+  - install -d -o github-runner -g github-runner /opt/actions-runner
+  - sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - systemctl try-reload-or-restart ssh.socket
+
+final_message: "Base lightwalletd snapshot host provisioning completed"

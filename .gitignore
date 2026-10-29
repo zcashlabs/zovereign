@@ -1,2 +1,11 @@
 snapshots/
 *.partial.*
+
+# OpenTofu/Terraform local state and provider data.
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/terraform.tfvars
+**/*.auto.tfvars
+crash.log
