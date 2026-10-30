@@ -17,17 +17,13 @@ jobs:
     runs-on: [self-hosted, linux, x64, lightwalletd-snapshot]
     timeout-minutes: 180
     env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: us-east-1
       CONTAINER_NAME: lightwalletd
       DATA_DIR: /var/lib/lightwalletd
       LIGHTWALLETD_VERSION: v0.6.0
       EXPECTED_IMAGE: electriccoinco/lightwalletd:v0.6.0@sha256:abc8199dae800e050415a3459f71c7850aeefeb1ca6a681e9b9eda7249ce8613
       QUIESCE_MODE: pause
       SNAPSHOT_DIR: /srv/lightwalletd/snapshots
-      S3_PREFIX: mainnet/v0.6.0
-      S3_ENDPOINT_URL: ${{ vars.SPACES_ENDPOINT }}
+      PUBLIC_BASE_URL: https://165-232-183-161.sslip.io
 
     steps:
       - name: Check out repository
@@ -44,12 +40,10 @@ jobs:
         id: create
         run: ./scripts/create-snapshot.sh "$SNAPSHOT_DIR"
 
-      - name: Publish snapshot to DigitalOcean Spaces
+      - name: Publish snapshot from the DigitalOcean volume
         env:
-          S3_BUCKET: ${{ vars.SPACES_BUCKET }}
-          S3_PUBLIC_READ: '1'
-          DELETE_LOCAL_AFTER_UPLOAD: '1'
-        run: ./scripts/publish-to-s3.sh "${{ steps.create.outputs.archive_path }}"
+          RETAIN_ARCHIVES: '3'
+        run: ./scripts/publish-local.sh "${{ steps.create.outputs.archive_path }}"
 
       - name: Verify source recovered
         if: always()
