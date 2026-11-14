@@ -156,9 +156,25 @@ def download(item, archive, chunk_bytes, reserve_bytes, workers=1):
         raise StackError("DOWNLOAD_WORKERS must not exceed 8")
     for stale in archive.parent.glob(archive.name + ".range-*"):
         stale.unlink()
-    pending = []
+    # Bound active + completed ranges to twice the concurrency. A slow prefix
+    # may eventually apply backpressure, but cannot accumulate an entire archive.
+    window = 2 * workers
     jobs = []
     next_offset = offset
+    completed = threading.Event()
+
+    def start(job):
+        process = spawn(job["args"])
+        job["process"] = process
+
+        def notify_exit():
+            process.wait()
+            completed.set()
+
+        # Wake immediately when any curl exits, without polling latency on fast
+        # publishers. Only live requests own a waiter; cleanup reaps them below.
+        job["waiter"] = threading.Thread(target=notify_exit, daemon=True)
+        job["waiter"].start()
 
     def enqueue():
         nonlocal next_offset
@@ -177,8 +193,10 @@ def download(item, archive, chunk_bytes, reserve_bytes, workers=1):
         ]
         job = {"start": next_offset, "end": end, "chunk": chunk, "headers": headers, "args": args}
         jobs.append(job)
-        job["process"] = spawn(args)
-        pending.append(job)
+        start(job)
+        job["attempt"] = 1
+        job["ready"] = False
+        job["retry_at"] = 0
         next_offset = end + 1
 
     log(f"Downloading {archive.name}: {offset:,}/{size:,} bytes (resuming stored progress; {workers} connections)")
@@ -186,47 +204,79 @@ def download(item, archive, chunk_bytes, reserve_bytes, workers=1):
         for _ in range(workers):
             enqueue()
         with archive.open("ab") as output:
-            while pending:
-                job = pending.pop(0)
-                end, chunk, headers = job["end"], job["chunk"], job["headers"]
-                expected = end - offset + 1
-                for attempt in range(1, 6):
+            while jobs:
+                completed.clear()
+                changed = False
+                for job in jobs:
+                    if job["ready"]:
+                        continue
+                    process = job["process"]
+                    if process is None:
+                        if time.monotonic() >= job["retry_at"]:
+                            start(job)
+                            changed = True
+                        continue
+                    result = process.poll()
+                    if result is None:
+                        continue
+                    CHILDREN.discard(process)
+                    job["waiter"].join()
+                    start_offset, end = job["start"], job["end"]
+                    chunk, headers = job["chunk"], job["headers"]
                     try:
-                        process = job["process"]
-                        result = process.wait()
-                        CHILDREN.discard(process)
                         if result != 0:
                             raise StackError(f"curl exited with status {result}")
                         response_headers = headers.read_text().lower()
                         ranges = re.findall(r"^content-range:\s*bytes (\d+)-(\d+)/(\d+)\s*$", response_headers, re.M)
-                        full_response = offset == 0 and end + 1 == size and not ranges
-                        if (not full_response and (not ranges or tuple(map(int, ranges[-1])) != (offset, end, size))) or chunk.stat().st_size != expected:
+                        full_response = start_offset == 0 and end + 1 == size and not ranges
+                        if (not full_response and (not ranges or tuple(map(int, ranges[-1])) != (start_offset, end, size))) or chunk.stat().st_size != end - start_offset + 1:
                             raise StackError("Publisher returned an incorrect HTTP byte range or size")
-                        break
+                        job["ready"] = True
                     except StackError:
-                        if attempt == 5:
+                        if job["attempt"] == 5:
                             raise
-                        log(f"Retrying range {offset}-{end}, attempt {attempt + 1}/5")
-                        time.sleep(min(attempt * 2, 10))
-                        job["process"] = spawn(job["args"])
-                try:
-                    with chunk.open("rb") as source:
-                        shutil.copyfileobj(source, output, length=1024 * 1024)
-                    output.flush()
-                    os.fsync(output.fileno())
-                except BaseException:
-                    output.truncate(offset)
-                    raise
-                offset = end + 1
-                log(f"{archive.name}: {offset:,}/{size:,} bytes ({offset * 100 // size}%)")
-                chunk.unlink(missing_ok=True)
-                headers.unlink(missing_ok=True)
-                jobs.remove(job)
-                enqueue()
+                        delay = min(job["attempt"] * 2, 10)
+                        job["attempt"] += 1
+                        log(f"Retrying range {start_offset}-{end}, attempt {job['attempt']}/5")
+                        job["process"] = None
+                        job["retry_at"] = time.monotonic() + delay
+                    changed = True
+
+                # Only the validated contiguous prefix is durable resume progress.
+                while jobs and jobs[0]["ready"]:
+                    job = jobs[0]
+                    try:
+                        with job["chunk"].open("rb") as source:
+                            shutil.copyfileobj(source, output, length=1024 * 1024)
+                        output.flush()
+                        os.fsync(output.fileno())
+                    except BaseException:
+                        output.truncate(offset)
+                        raise
+                    offset = job["end"] + 1
+                    log(f"{archive.name}: {offset:,}/{size:,} bytes ({offset * 100 // size}%)")
+                    job["chunk"].unlink(missing_ok=True)
+                    job["headers"].unlink(missing_ok=True)
+                    jobs.pop(0)
+                    changed = True
+
+                # Refill on any completion, not just completion of the oldest job.
+                # Backoff jobs reserve a slot so their retry cannot exceed workers.
+                active = sum(not job["ready"] for job in jobs)
+                while next_offset < size and active < workers and len(jobs) < window:
+                    enqueue()
+                    active += 1
+                    changed = True
+                if not changed:
+                    retries = [job["retry_at"] for job in jobs if job["process"] is None]
+                    timeout = max(0, min(retries) - time.monotonic()) if retries else None
+                    completed.wait(timeout)
     finally:
         for job in jobs:
-            if "process" in job:
+            if job.get("process") is not None:
                 stop(job["process"], grace=5)
+            if "waiter" in job and job["waiter"].ident is not None:
+                job["waiter"].join()
             job["chunk"].unlink(missing_ok=True)
             job["headers"].unlink(missing_ok=True)
     log(f"Verifying SHA-256 of {archive.name}")

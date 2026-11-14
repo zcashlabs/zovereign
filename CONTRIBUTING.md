@@ -18,7 +18,7 @@ docker run --rm --entrypoint python3 \
   zovereign:test /tests/test_stack.py
 ```
 
-These 16 tests use tiny local HTTP snapshots and temporary databases. They
+These 21 tests use tiny local HTTP snapshots and temporary databases. They
 exercise retries, resumption, checksum and compatibility rejection, unsafe
 archives, disk exhaustion, process supervision, and application health. They
 also run the bundled Zakura and lightwalletd binaries briefly to catch
@@ -42,6 +42,32 @@ This is an opt-in check that waits for readiness and restarts the selected
 container to prove database reuse. It can take hours and download hundreds of
 gigabytes. Acceptance reports can contain deployment details; keep them out
 of commits unless reviewed and sanitized.
+
+## Downloader scheduling benchmark
+
+Use `tests/benchmark_download.py` to compare an original `stack.py` with the
+candidate against the same local HTTP publisher. It runs three trials with
+three and six connections, uniform delays, a slow first range, repeated slow
+ranges, and deterministic variable delays. Each download is 18 x 64 KiB and
+must match its SHA-256. The server delays isolate scheduling; these small
+synthetic timings are not mainnet throughput predictions.
+
+After building the candidate image, save the baseline outside the repository
+and mount it read-only. For example, with the baseline commit selected:
+
+```bash
+git show <baseline-commit>:docker/stack.py > /tmp/zovereign-baseline.py
+docker run --rm --network none --entrypoint python3 \
+  -e STACK_MODULE=/opt/zovereign/stack.py \
+  --mount "type=bind,src=$(pwd)/tests,dst=/tests,readonly" \
+  --mount type=bind,src=/tmp/zovereign-baseline.py,dst=/baseline.py,readonly \
+  zovereign:test /tests/benchmark_download.py \
+  --baseline /baseline.py --candidate /opt/zovereign/stack.py
+```
+
+Output is JSON Lines with individual durations and median/min/max/standard
+deviation by scenario. Compare the same concurrency and chunk size, and report
+regressions as well as improvements. No live volume or external network is used.
 
 ## Continuous integration and image publication
 

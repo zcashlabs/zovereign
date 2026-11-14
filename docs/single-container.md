@@ -106,7 +106,10 @@ still downloads the complete snapshots and processes blocks after their tips.
    `30`.
 3. Pin the selected manifest in `/data/bootstrap/zakura.json`. Download using
    256 MiB HTTP ranges with three parallel connections and retries, checking
-   returned range offsets and sizes. Ranges commit to the archive in order.
+   returned range offsets and sizes. Any finished range frees a connection for
+   more work; active and completed ranges are bounded to twice the worker count.
+   A slow early range can still apply backpressure when that window fills.
+   Ranges commit to the archive in order.
    Completed bytes persist in a `.part` file. Restarting continues that same
    snapshot, even if the publisher's `latest` entry has changed.
 4. Verify the entire compressed archive's SHA-256, then extract into a staging
