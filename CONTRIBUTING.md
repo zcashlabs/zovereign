@@ -75,6 +75,24 @@ supported by the pinned Zakura image. CI does not download mainnet snapshots:
 ARM64 and Docker Desktop still need full-mainnet acceptance before claiming
 those environments have completed a real restore.
 
+### Versioned GitHub releases
+
+Publishing `latest` creates a container package; it does not create an entry
+on GitHub's Releases page. For a numbered release, run the **Release** workflow
+on `main` with an unused stable version:
+
+```bash
+gh workflow run release.yml --ref main -f version=v0.1.0
+```
+
+The workflow validates the version, calls the complete native build/test and
+publication pipeline, tags that tested multi-platform image with the version,
+then creates the Git tag and published GitHub Release with installation notes.
+Choose a new version for each release. A failed build or test prevents the
+GitHub Release from being created. The release's Docker tag and source tag
+refer to the same commit. The GitHub release archives contain source code;
+the runnable image is in GHCR.
+
 The project's image has been verified with an unauthenticated pull. For new
 packages or forks, check visibility: if GitHub creates a private package, an
 administrator must set it to **Public** in GitHub package settings before

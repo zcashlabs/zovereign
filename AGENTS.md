@@ -16,6 +16,8 @@ CONTRIBUTING.md, and docs/single-container.md first.
   source and Go toolchain, and runtime dependencies.
 - `.github/workflows/container-test.yml`: native amd64/arm64 build and test
   matrix; publication combines the exact tested images after both jobs pass.
+- `.github/workflows/release.yml`: manual versioned release on main; reuses
+  the full container pipeline, tags the image, and creates a GitHub Release.
 - `compose.yaml` and `.env.example`: local user startup defaults.
 - `tests/test_stack.py`: fixture and real-binary regressions; no mainnet download.
 - `tests/accept_mainnet.py`: opt-in acceptance for an existing real deployment.
