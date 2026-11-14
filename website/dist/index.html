@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zovereign — Your own Zcash stack, in one container</title>
-<meta name="description" content="Zovereign restores a Zcash mainnet archive node and lightwalletd from published snapshots and runs them together in one Docker container. No RPC provider, no credentials, no rebuilding history from the network.">
+<meta name="description" content="Run your own Zcash archive node and lightwalletd in one Docker container. Native AMD64 and ARM64 images for Linux, or Docker Desktop on macOS and Windows. Start from snapshots with one command.">
 <meta name="theme-color" content="#f2ecdf">
 <meta property="og:title" content="Zovereign — Your own Zcash stack, in one container">
-<meta property="og:description" content="A Zakura archive node and lightwalletd, restored from snapshots and supervised as a pair. One docker run.">
+<meta property="og:description" content="Your own Zcash archive node and lightwalletd. One Docker image, native AMD64 and ARM64 builds. Linux, plus macOS and Windows through Docker Desktop.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://zcashlabs.github.io/zovereign/">
 <link rel="canonical" href="https://zcashlabs.github.io/zovereign/">
@@ -48,15 +48,16 @@
       <p class="kicker"><span class="dot" aria-hidden="true"></span> Self-hosted Zcash infrastructure · one Docker image</p>
       <h1 id="hero-title" class="display">Run your own Zcash stack.</h1>
       <p class="lede">Zovereign lets you run <strong>lightwalletd</strong> and a <strong>Zcash archive full node</strong> with one command. Connect your wallets to your own infrastructure, transact without a third-party RPC provider, and build privacy-focused apps.</p>
+      <p class="platform-note"><strong>Native AMD64 &amp; ARM64.</strong> Run on Linux, or use Docker Desktop on macOS and Windows.</p>
       <div class="hero-actions">
         <a class="btn btn-gold" href="#install">Get started <span aria-hidden="true">→</span></a>
         <a class="btn btn-ghost" href="#inside">How it works</a>
       </div>
-      <dl class="spec-plate" aria-label="Bundled versions">
+      <dl class="spec-plate" aria-label="Bundled versions and architectures">
         <div><dt>Node</dt><dd>Zakura 1.8.7</dd></div>
         <div><dt>Mode</dt><dd>Archive · DB 30</dd></div>
         <div><dt>Wallet server</dt><dd>lightwalletd v0.6.0</dd></div>
-        <div><dt>Platform</dt><dd>amd64 / arm64</dd></div>
+        <div><dt>Architectures</dt><dd>amd64 / arm64</dd></div>
       </dl>
     </div>
     <figure class="hero-fig">
@@ -126,6 +127,7 @@
   ghcr.io/zcashlabs/zovereign:latest</code></pre>
         </div>
         <ul class="flag-notes">
+          <li>Docker automatically selects the AMD64 or ARM64 image. Use the same command on either.</li>
           <li><code>--mount …zovereign-data</code> keeps databases and download progress across container replacement.</li>
           <li><code>127.0.0.1:9067</code> publishes wallet gRPC to your machine only.</li>
           <li><code>--stop-timeout 120</code> gives both databases time to flush on stop.</li>
@@ -141,6 +143,7 @@ cd zovereign
 docker compose up -d --build</code></pre>
         </div>
         <ul class="flag-notes">
+          <li>Builds natively for your machine’s AMD64 or ARM64 CPU.</li>
           <li>Same defaults: bounded logs, two-minute shutdown grace, loopback gRPC, persistent volume.</li>
           <li>Optional: copy <code>.env.example</code> to <code>.env</code> to change ports, download concurrency or disk reserve.</li>
           <li>Pause with <code>docker compose stop</code>; resume with <code>docker compose start</code>.</li>
@@ -227,11 +230,11 @@ docker compose up -d --build</code></pre>
         <div><dt>Disk space</dt><dd>1 TB</dd></div>
       </dl>
       <ul class="compat">
-        <li class="ok"><b>Linux amd64</b> — supported and tested.</li>
-        <li class="ok"><b>Docker Desktop / WSL 2</b> — give Docker the CPU, memory and disk space listed above.</li>
-        <li class="ok"><b>Native ARM64</b> — built and tested in CI. Full mainnet setup is still unverified.</li>
-        <li class="warn"><b>Apple Silicon</b> — uses the native ARM64 image in Docker Desktop. Full setup on these Macs is still unverified.</li>
+        <li class="ok"><b>Linux</b> — Intel/AMD (AMD64) and ARM64 machines.</li>
+        <li class="ok"><b>macOS</b> — Docker Desktop on Intel and Apple Silicon Macs. Apple Silicon uses the native ARM64 image.</li>
+        <li class="ok"><b>Windows</b> — Docker Desktop with WSL 2 and Linux containers.</li>
       </ul>
+      <p class="compat-note">Give Docker the resources listed above. Both architectures are tested in CI; full mainnet setup has been verified on Linux AMD64. ARM64 and Docker Desktop full setup is still unverified.</p>
     </div>
   </div>
 </section>
@@ -367,12 +370,16 @@ docker compose up -d --build</code></pre>
         <p>They live and die as a pair. If either exits, the supervisor stops its peer gracefully and exits, and Docker’s restart policy brings the whole stack back on the same volume.</p>
       </details>
       <details>
-        <summary>Will it run on my M-series Mac?</summary>
-        <p>Yes, Docker selects the native ARM64 image on Apple Silicon. CI builds and tests both ARM64 and AMD64, but a full mainnet setup has only been verified on Linux AMD64. Give Docker Desktop the recommended CPU, memory and disk space.</p>
+        <summary>Which computers can run Zovereign?</summary>
+        <p>The image supports AMD64 (Intel/AMD) and ARM64 CPUs. Run it directly with Docker on Linux, or use Docker Desktop on macOS and Windows. Apple Silicon gets a native ARM64 image without AMD64 emulation. On Windows, use WSL 2 and Linux containers. Both architectures are tested in CI; a full mainnet setup has only been verified on Linux AMD64.</p>
+      </details>
+      <details>
+        <summary>Do I need to choose an architecture?</summary>
+        <p>No. The same Docker command works on AMD64 and ARM64. Docker picks the right image automatically, including with version tags such as <code>v0.1.0</code>. Compose builds for your machine’s architecture too. See the <a href="https://github.com/zcashlabs/zovereign/releases/latest">latest release</a> for version details.</p>
       </details>
       <details>
         <summary>How do I update without losing anything?</summary>
-        <p>Pull the new image, stop with a 120-second grace period, remove the container, and run the same command again with the same <code>zovereign-data</code> volume. The databases stay put. Check release notes first: an incompatible database is refused, not silently replaced. Pin a <code>sha-&lt;commit&gt;</code> tag or digest when you want controlled upgrades.</p>
+        <p>Pull the new image, stop with a 120-second grace period, remove the container, and run the same command again with the same <code>zovereign-data</code> volume. The databases stay put. Check release notes first: an incompatible database is refused, not silently replaced. Choose a version tag from the <a href="https://github.com/zcashlabs/zovereign/releases">releases page</a>, or pin a <code>sha-&lt;commit&gt;</code> tag or digest for controlled upgrades.</p>
       </details>
     </div>
   </div>
@@ -410,6 +417,7 @@ docker compose up -d --build</code></pre>
       <h2 class="foot-h">Project</h2>
       <ul>
         <li><a href="https://github.com/zcashlabs/zovereign">Source on GitHub</a></li>
+        <li><a href="https://github.com/zcashlabs/zovereign/releases/latest">Latest release</a></li>
         <li><a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md">Deployment guide</a></li>
         <li><a href="https://github.com/zcashlabs/zovereign/blob/main/CONTRIBUTING.md">Contributing &amp; tests</a></li>
         <li><a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#trust-and-validation-boundary">Trust boundary</a></li>
@@ -418,7 +426,7 @@ docker compose up -d --build</code></pre>
     <div>
       <h2 class="foot-h">Image</h2>
       <p class="foot-mono">ghcr.io/zcashlabs/zovereign:latest</p>
-      <p class="foot-small">Pin <code>sha-&lt;full-commit&gt;</code> or a digest for a specific tested build.</p>
+      <p class="foot-small">Native AMD64 &amp; ARM64. Pin a <a href="https://github.com/zcashlabs/zovereign/releases">version tag</a> or digest for a specific release.</p>
     </div>
   </div>
   <div class="wrap foot-base">

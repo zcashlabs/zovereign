@@ -48,6 +48,11 @@ canonical and Open Graph URLs in `index.html`.
   Measured results (byte counts, block count, test count, timings) are dated
   evidence from 14 November 2026. Present them as dated evidence, not live
   metrics or guarantees.
+- Describe the published image as Linux AMD64/ARM64. macOS and Windows use
+  Docker Desktop's Linux containers; Apple Silicon uses the native ARM64 image.
+  Keep architecture selection automatic in commands. Both architectures have
+  CI coverage, while full mainnet acceptance is only verified on Linux AMD64.
+  Link release information to the repository's Releases page.
 - Don't describe the stack as trustless. Snapshot checksums protect
   integrity, not publisher authenticity.
 - Never show `docker compose down -v` as an ordinary stop command. It

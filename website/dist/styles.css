@@ -18,7 +18,6 @@
   --green-3: #153629;
   --green-l: #cfe0d4;
   --ivory-dim: #d9d1bf;
-  --danger: #9b2f1e;
 
   --f-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
   --f-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -125,6 +124,7 @@ strong { font-weight: 650; }
 .hero::after { content: ""; position: absolute; left: var(--gutter); right: var(--gutter); bottom: 0; max-width: calc(var(--wrap) - 2 * var(--gutter)); margin: 0 auto; border-bottom: 1.5px solid var(--ink); }
 .hero-grid { display: grid; grid-template-columns: 1fr; gap: clamp(32px, 4vw, 48px); align-items: center; }
 @media (min-width: 1040px) { .hero-grid { grid-template-columns: minmax(0, .92fr) minmax(0, 1.2fr); } }
+.platform-note { margin: 0 0 1.5em; max-width: 38em; font-size: .95rem; line-height: 1.5; color: var(--green); }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 2.2em; }
 .hero-actions.center { justify-content: center; }
 .spec-plate { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border: 1.5px solid var(--ink); border-radius: 10px; overflow: hidden; max-width: 520px; background: var(--paper); }
@@ -241,8 +241,7 @@ strong { font-weight: 650; }
 .compat li { position: relative; padding: 10px 12px 10px 40px; background: rgba(251,248,240,.75); border-radius: 8px; font-size: .95rem; }
 .compat li::before { position: absolute; left: 12px; top: 10px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 700 11px/18px var(--f-mono); text-align: center; color: var(--paper); }
 .compat .ok::before { content: "✓"; background: var(--green); }
-.compat .no::before { content: "✕"; background: var(--danger); }
-.compat .warn::before { content: "!"; background: var(--gold); color: var(--ink); }
+.compat-note { margin: 16px 0 0; font-size: .88rem; color: var(--ink-2); }
 
 /* ---------- install (dark) ---------- */
 .install { padding: var(--sec-y) 0; background: var(--ink); color: var(--paper); border-top: 1.5px solid var(--ink); }
