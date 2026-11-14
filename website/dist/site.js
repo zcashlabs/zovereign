@@ -134,7 +134,7 @@
   }
 
   /* ---- reveal on scroll (purely decorative; content is visible without JS) ---- */
-  var revealTargets = document.querySelectorAll('.ledger li, .timeline, .step, .why-item, .report, .trust-col, .plate');
+  var revealTargets = document.querySelectorAll('.timeline, .step, .why-item, .report, .trust-col, .plate');
   if (!('IntersectionObserver' in window) || reduceMotion) {
     revealTargets.forEach(function (el) { el.classList.add('in'); });
   } else {

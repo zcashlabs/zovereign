@@ -179,23 +179,6 @@ docker compose up -d --build</code></pre>
   </div>
 </section>
 
-<!-- ============ LEDGER ============ -->
-<section class="ledger-sec" aria-labelledby="ledger-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 id="ledger-title" class="h2">Things you can stop doing.</h2>
-      <p class="sec-intro">Running Zcash wallet infrastructure used to mean a weekend of glue. Zovereign does the glue, and does it the same way every time.</p>
-    </div>
-    <ol class="ledger">
-      <li><s>Renting an RPC endpoint from someone else and hoping it stays up and stays honest about tip height.</s><span class="now">Your wallet server talks to <em>your</em> node, over loopback, inside one container.</span></li>
-      <li><s>Rebuilding years of chain history block by block before anything is useful.</s><span class="now">A published archive snapshot restores that history; the node only processes what came after.</span></li>
-      <li><s>Hand-writing RPC credentials and wiring two daemons that must start in the right order.</s><span class="now">No credentials to manage. lightwalletd waits until Zakura is near tip, then starts.</span></li>
-      <li><s>Restarting a 275 GB download because the Wi-Fi blinked.</s><span class="now">Range downloads resume from committed bytes, pinned to the same snapshot.</span></li>
-      <li><s>Calling it “healthy” because a port is open.</s><span class="now">Healthy means lightwalletd just served a real compact block from your node.</span></li>
-    </ol>
-  </div>
-</section>
-
 <!-- ============ HOW IT WORKS ============ -->
 <section class="how" id="how" aria-labelledby="how-title">
   <div class="wrap">
