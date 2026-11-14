@@ -9,7 +9,8 @@ The scripts below are also available independently. The restore script
 requires an existing synchronized Zakura/Zcash RPC server; the combined image
 in the [quick start](../README.md) runs its own.
 
-For the complete data flow, consistency model, Docker restore mechanics, validation evidence, failure behavior, and security limitations, see [How lightwalletd snapshots work](how-snapshots-work.md).
+For the combined image's startup sequence, recovery behavior, validation, and
+trust boundary, see [the deployment guide](single-container.md).
 
 ## Requirements
 
@@ -112,8 +113,6 @@ sudo \
 
 The checksum detects accidental corruption but does not authenticate the publisher. Only use snapshots obtained from a source you trust. Signed manifests remain deferred.
 
-See [`PLAN.md`](../PLAN.md) for scope and acceptance criteria.
-
 ## Automated daily publication on DigitalOcean
 
 [The daily workflow](../.github/workflows/daily-snapshot.yml) runs on the source
@@ -155,6 +154,3 @@ sudo \
   ./scripts/start-from-snapshot.sh \
   "$SNAPSHOT_URL"
 ```
-
-The older AWS CloudFormation template and S3 publisher remain in the repository
-for the previous deployment. They are not part of the current daily workflow.

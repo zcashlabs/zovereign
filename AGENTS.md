@@ -18,8 +18,6 @@ CONTRIBUTING.md, and docs/single-container.md first.
 - `tests/accept_mainnet.py`: opt-in acceptance for an existing real deployment.
 - `scripts/` and `deploy/digitalocean/`: separate snapshot publisher tooling.
   Do not change that infrastructure incidentally while editing the combined image.
-- `PLAN.md` and most of `docs/how-snapshots-work.md`: historical original scope;
-  current combined-image behavior is documented in docs/single-container.md.
 
 ## Development and checks
 

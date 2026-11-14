@@ -1,6 +1,6 @@
 # DigitalOcean infrastructure
 
-This OpenTofu stack is the replacement target for the current AWS deployment.
+This OpenTofu stack provisions the snapshot publisher on DigitalOcean.
 It creates a project, VPC, SSH key, Droplet, firewall, persistent XFS volume,
 and—once Spaces credentials are supplied—a versioned Space with bounded
 retention and a CDN endpoint.

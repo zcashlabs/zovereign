@@ -77,7 +77,6 @@ review manifest compatibility checks, run tests, and document validation.
 | `tests/accept_mainnet.py` | Opt-in check of a real running mainnet deployment. |
 | `scripts/` | Standalone snapshot creation, restore, and publication. |
 | `deploy/digitalocean/`, `infra/digitalocean/` | Source publisher deployment. |
-| `infra/snapshot-storage.yaml`, `PLAN.md` | Earlier AWS deployment and original plan. |
 
 Keep runtime changes scoped and describe what was tested in your commit or PR.
 Documentation should distinguish fixture coverage from a real mainnet restore.
