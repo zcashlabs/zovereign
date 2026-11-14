@@ -7,11 +7,11 @@ before changing the runtime.
 
 ## Build and test without a blockchain download
 
-Use a Linux amd64 Docker host. From the repository root:
+Use a Linux amd64 or arm64 Docker host. From the repository root:
 
 ```bash
 docker compose config --quiet
-docker build --platform linux/amd64 -t zovereign:test .
+docker build -t zovereign:test .
 docker run --rm --entrypoint python3 \
   -e STACK_MODULE=/opt/zovereign/stack.py \
   --mount "type=bind,src=$(pwd)/tests,dst=/tests,readonly" \
@@ -46,12 +46,34 @@ of commits unless reviewed and sanitized.
 ## Continuous integration and image publication
 
 [The container workflow](.github/workflows/container-test.yml) validates
-Compose, builds the Linux amd64 image, and runs the fixture and real-binary
-tests on GitHub-hosted runners. Pull requests run tests without publishing.
-Relevant pushes to `main`, or a manual run on `main`, publish the tested image
-to `ghcr.io/zcashlabs/zovereign` as `latest` and `sha-<full-commit>` using the
-workflow's `GITHUB_TOKEN`. Forks publish under their own repository namespace.
-No registry password is required in repository secrets.
+Compose, builds, and runs all fixture and real-binary tests separately on
+native `ubuntu-24.04` (amd64) and `ubuntu-24.04-arm` (arm64) runners. Both jobs
+must pass before publication. Pull requests and non-main branches only test;
+they do not publish images.
+
+On relevant pushes to `main`, or a manual run on `main`, the publish job
+loads the exact tested images from short-lived workflow artifacts and pushes
+them to `ghcr.io/zcashlabs/zovereign`. It assembles a manifest containing both
+architectures under `sha-<full-commit>` and verifies its platform list before
+updating `latest`. Per-architecture tags are `sha-<full-commit>-amd64` and
+`sha-<full-commit>-arm64`. Docker selects the native architecture automatically.
+Only the publish job has registry write permission. Publication uses the
+workflow's `GITHUB_TOKEN`; no registry password is required in repository
+secrets. Forks use their own repository namespace.
+
+Zakura and grpcurl use pinned multi-platform upstream images. The upstream
+lightwalletd v0.6.0 image is amd64-only, so both architectures compile the same
+commit (`e7436d2adb9ab5828eb8a27de534e16218841fc2`) with Go 1.27.3. The Dockerfile
+pins the Go image digest and verifies the source tarball's SHA-256. Go modules
+are checked against upstream `go.sum` and built with `-mod=readonly`; CGO is
+disabled, as in upstream's Dockerfile. Preserve the release version and commit
+metadata when updating this build.
+
+The Linux images also run through Docker Desktop on macOS and Windows/WSL 2.
+They are not native macOS or Windows images. Other CPU architectures are not
+supported by the pinned Zakura image. CI does not download mainnet snapshots:
+ARM64 and Docker Desktop still need full-mainnet acceptance before claiming
+those environments have completed a real restore.
 
 The project's image has been verified with an unauthenticated pull. For new
 packages or forks, check visibility: if GitHub creates a private package, an

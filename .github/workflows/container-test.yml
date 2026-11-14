@@ -39,38 +39,108 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  container:
-    runs-on: ubuntu-latest
+  build:
+    name: Build and test (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate local deployment configuration
+        run: docker compose config --quiet
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build pinned runtime image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: zovereign:ci-${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=container-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=container-${{ matrix.arch }}
+      - name: Verify architecture and test the bundled runtime
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -Eeuo pipefail
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "zovereign:ci-$ARCH")" = "linux/$ARCH"
+          docker run --rm --platform "linux/$ARCH" --entrypoint python3 \
+            -e STACK_MODULE=/opt/zovereign/stack.py \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/tests,readonly" \
+            "zovereign:ci-$ARCH" /tests/test_stack.py
+      - name: Export tested image
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: docker save "zovereign:ci-$ARCH" -o "$RUNNER_TEMP/image-$ARCH.tar"
+      - name: Upload tested image
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-${{ matrix.arch }}
+          path: ${{ runner.temp }}/image-${{ matrix.arch }}.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: Publish multi-platform image
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
+      actions: read
       packages: write
     steps:
-      - uses: actions/checkout@v5
-      - name: Validate local deployment configuration
-        run: docker compose config --quiet
-      - name: Build pinned runtime image
-        run: |
-          docker build --platform linux/amd64 -t zovereign:test \
-            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
-      - name: Test bootstrap and supervision inside the image
-        run: |
-          docker run --rm --entrypoint python3 \
-            -e STACK_MODULE=/opt/zovereign/stack.py \
-            --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/tests,readonly" \
-            zovereign:test /tests/test_stack.py
-      - name: Publish the tested image
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download tested images
+        uses: actions/download-artifact@v8
+        with:
+          pattern: image-*
+          path: ${{ runner.temp }}/images
+          merge-multiple: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish exactly the tested images and assemble the manifest
         run: |
           set -Eeuo pipefail
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
-          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker tag zovereign:test "$image:sha-$GITHUB_SHA"
-          docker push "$image:sha-$GITHUB_SHA"
-          docker tag zovereign:test "$image:latest"
-          docker push "$image:latest"
-          printf 'Tested Linux amd64 image: `%s:sha-%s`\n\nFor new packages, verify Public visibility before advertising anonymous pulls.\n' \
+          for arch in amd64 arm64; do
+            docker load -i "$RUNNER_TEMP/images/image-$arch.tar"
+            docker tag "zovereign:ci-$arch" "$image:sha-$GITHUB_SHA-$arch"
+            docker push "$image:sha-$GITHUB_SHA-$arch"
+          done
+          docker buildx imagetools create \
+            --tag "$image:sha-$GITHUB_SHA" \
+            "$image:sha-$GITHUB_SHA-amd64" "$image:sha-$GITHUB_SHA-arm64"
+          docker buildx imagetools inspect "$image:sha-$GITHUB_SHA" --raw > "$RUNNER_TEMP/manifest.json"
+          python3 - "$RUNNER_TEMP/manifest.json" <<'PYTHON'
+          import json, sys
+          with open(sys.argv[1]) as source:
+              manifest = json.load(source)
+          platforms = {(entry['platform']['os'], entry['platform']['architecture']) for entry in manifest['manifests']}
+          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
+          PYTHON
+          docker buildx imagetools create --tag "$image:latest" "$image:sha-$GITHUB_SHA"
+          printf 'Published `%s:sha-%s` and `latest` for Linux amd64 and arm64 after both native test jobs passed.\n' \
             "$image" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

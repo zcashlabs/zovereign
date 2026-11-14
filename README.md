@@ -27,17 +27,21 @@ interrupted downloads resume.
 initial download is approximately 300 GB as of November 2026, with additional
 space required during extraction. First startup can take hours.
 
-Linux amd64 is the tested platform. Docker Desktop users must allocate these
-resources to Docker's VM. On Windows, use Linux containers and run the commands
-in WSL 2. Apple Silicon uses amd64 emulation; native arm64 is not currently
-supported, and a full mainnet restore under emulation has not been validated.
+The image supports **Linux amd64 and arm64**. Docker selects your architecture
+automatically, including native ARM64 on Apple Silicon. macOS and Windows run
+the Linux image through Docker Desktop; on Windows, use Linux containers and
+run the commands in WSL 2. Allocate the resources above to Docker's VM.
+
+CI builds and runs fixture and bundled-binary tests on both architectures.
+A complete mainnet restore has been verified on Linux amd64; full-mainnet
+validation on ARM64 and Docker Desktop is still pending.
 
 ## Run the published image directly
 
 Without cloning the repository or building an image, run:
 
 ```bash
-docker run -d --platform linux/amd64 \
+docker run -d \
   --name zovereign --restart unless-stopped --stop-timeout 120 \
   --log-driver json-file --log-opt max-size=20m --log-opt max-file=3 \
   --mount type=volume,src=zovereign-data,dst=/data \
@@ -115,7 +119,8 @@ run `docker compose up -d --build` to apply changes.
   publisher or restore standalone lightwalletd against an existing RPC server.
 
 This image bundles Zakura **1.8.7** (archive database major **30**) and
-lightwalletd **v0.6.0**, with upstream images pinned by digest. It passed 16
+lightwalletd **v0.6.0**. Base images are pinned by digest; lightwalletd is built
+from a fixed upstream commit with a verified source archive checksum. It passed 16
 bootstrap and lifecycle tests and a complete mainnet restore on a clean Linux
 VPS on 14 November 2026. lightwalletd loaded **3,571,794 cached blocks**, served
 blocks near the bundled node's tip, and restarted without downloading again.

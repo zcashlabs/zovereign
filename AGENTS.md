@@ -2,7 +2,7 @@
 
 ## Project
 
-Zovereign provides a single Linux amd64 Docker image containing Zakura 1.8.7
+Zovereign provides a multi-platform Linux amd64/arm64 Docker image containing Zakura 1.8.7
 (archive database major 30), lightwalletd v0.6.0, and a Python bootstrap and
 supervision process. It restores published mainnet snapshots, then serves
 lightwalletd against the bundled node's private RPC. Read README.md,
@@ -12,7 +12,10 @@ CONTRIBUTING.md, and docs/single-container.md first.
 
 - `docker/stack.py`: snapshot selection, range download, checksum verification,
   staged extraction, privilege dropping, supervision, and health probes.
-- `Dockerfile`: pinned upstream binaries and runtime dependencies.
+- `Dockerfile`: pinned Zakura/grpcurl images, checksum-pinned lightwalletd
+  source and Go toolchain, and runtime dependencies.
+- `.github/workflows/container-test.yml`: native amd64/arm64 build and test
+  matrix; publication combines the exact tested images after both jobs pass.
 - `compose.yaml` and `.env.example`: local user startup defaults.
 - `tests/test_stack.py`: fixture and real-binary regressions; no mainnet download.
 - `tests/accept_mainnet.py`: opt-in acceptance for an existing real deployment.
@@ -32,7 +35,7 @@ particular VPS address, SSH access, or credentials.
 
 ```bash
 docker compose config --quiet
-docker build --platform linux/amd64 -t zovereign:test .
+docker build -t zovereign:test .
 docker run --rm --entrypoint python3 \
   -e STACK_MODULE=/opt/zovereign/stack.py \
   --mount "type=bind,src=$(pwd)/tests,dst=/tests,readonly" \
@@ -70,8 +73,11 @@ when only fixtures ran. CI builds, tests, and publishes on relevant main pushes.
 ## Documentation and publication
 
 Keep README's clean-checkout commands, Compose defaults, supported platform,
-resource requirements, and config documentation aligned. Native ARM64 is not
-supported; do not imply Apple Silicon emulation has passed full acceptance.
+resource requirements, and config documentation aligned. Linux amd64 and arm64
+have native CI builds and fixture/real-binary coverage. Full mainnet acceptance
+has only been completed on amd64; do not imply ARM64 or Docker Desktop has
+passed full acceptance. Keep automatic native architecture selection in public
+commands and Compose; do not force amd64 by default.
 Pin upstream versions and digests together. Document database compatibility
 when upgrading. Never commit credentials, `.env`, node databases, downloaded
 archives, Terraform state, or raw private deployment reports. Keep the Docker

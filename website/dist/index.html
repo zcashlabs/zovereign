@@ -56,7 +56,7 @@
         <div><dt>Node</dt><dd>Zakura 1.8.7</dd></div>
         <div><dt>Mode</dt><dd>Archive · DB 30</dd></div>
         <div><dt>Wallet server</dt><dd>lightwalletd v0.6.0</dd></div>
-        <div><dt>Platform</dt><dd>linux/amd64</dd></div>
+        <div><dt>Platform</dt><dd>amd64 / arm64</dd></div>
       </dl>
     </div>
     <figure class="hero-fig">
@@ -118,7 +118,7 @@
         <h3 class="panel-h">Published image <span>· nothing to clone</span></h3>
         <div class="code">
           <div class="code-bar"><span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="code-name">shell</span><button class="copy" type="button" data-copy="cmd-run" hidden><span class="copy-label">Copy</span></button></div>
-<pre id="cmd-run"><code>docker run -d --platform linux/amd64 \
+<pre id="cmd-run"><code>docker run -d \
   --name zovereign --restart unless-stopped --stop-timeout 120 \
   --log-driver json-file --log-opt max-size=20m --log-opt max-file=3 \
   --mount type=volume,src=zovereign-data,dst=/data \
@@ -229,8 +229,8 @@ docker compose up -d --build</code></pre>
       <ul class="compat">
         <li class="ok"><b>Linux amd64</b> — supported and tested.</li>
         <li class="ok"><b>Docker Desktop / WSL 2</b> — give Docker the CPU, memory and disk space listed above.</li>
-        <li class="no"><b>Native ARM64</b> — not supported.</li>
-        <li class="warn"><b>Apple Silicon</b> — requires amd64 emulation. A full setup has not been tested on these Macs.</li>
+        <li class="ok"><b>Native ARM64</b> — built and tested in CI. Full mainnet setup is still unverified.</li>
+        <li class="warn"><b>Apple Silicon</b> — uses the native ARM64 image in Docker Desktop. Full setup on these Macs is still unverified.</li>
       </ul>
     </div>
   </div>
@@ -254,7 +254,7 @@ docker compose up -d --build</code></pre>
           </defs>
           <rect width="1000" height="560" fill="url(#grid)"/>
           <rect x="196" y="36" width="568" height="488" rx="14" class="bp-hull"/>
-          <text x="214" y="28" class="bp-cap">CONTAINER · LINUX/AMD64 · ghcr.io/zcashlabs/zovereign</text>
+          <text x="214" y="28" class="bp-cap">CONTAINER · LINUX AMD64 / ARM64 · ghcr.io/zcashlabs/zovereign</text>
 
           <g class="bp-part" data-part="sup">
             <rect x="228" y="62" width="504" height="50" rx="8" class="bp-box"/>
@@ -368,7 +368,7 @@ docker compose up -d --build</code></pre>
       </details>
       <details>
         <summary>Will it run on my M-series Mac?</summary>
-        <p>It runs under amd64 emulation, but a full mainnet restore under emulation has not passed validation, and native ARM64 isn’t supported. Linux amd64 is the tested platform. On any Docker Desktop, allocate the CPU, memory and disk to Docker’s VM.</p>
+        <p>Yes, Docker selects the native ARM64 image on Apple Silicon. CI builds and tests both ARM64 and AMD64, but a full mainnet setup has only been verified on Linux AMD64. Give Docker Desktop the recommended CPU, memory and disk space.</p>
       </details>
       <details>
         <summary>How do I update without losing anything?</summary>

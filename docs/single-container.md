@@ -1,7 +1,7 @@
 # One container for a snapshot-bootstrapped Zcash node and lightwalletd
 
 The root `Dockerfile` packages Zakura 1.8.7 and lightwalletd v0.6.0 into one
-Linux amd64 image. It restores the latest mainnet archive from the Zakura
+Linux amd64/arm64 image. It restores the latest mainnet archive from the Zakura
 publisher and the latest compatible compact-block cache from our publisher,
 then runs both services. lightwalletd uses the Zakura RPC inside the same
 container at `127.0.0.1:8232`.
@@ -23,13 +23,13 @@ arguments instead.
 From the repository root, build the image once:
 
 ```bash
-docker build --platform linux/amd64 -t zovereign:local .
+docker build -t zovereign:local .
 ```
 
 Start the complete stack with one command:
 
 ```bash
-docker run -d --platform linux/amd64 \
+docker run -d \
   --name zovereign \
   --restart unless-stopped \
   --stop-timeout 120 \
@@ -56,7 +56,7 @@ The [README](../README.md#run-the-published-image-directly) also provides a
 prebuilt image command. To replace that container while keeping the databases:
 
 ```bash
-docker pull --platform linux/amd64 ghcr.io/zcashlabs/zovereign:latest
+docker pull ghcr.io/zcashlabs/zovereign:latest
 docker stop -t 120 zovereign
 docker rm zovereign
 ```
@@ -69,12 +69,18 @@ TLS mounts, or environment variables, preserve those options when recreating it.
 
 ## Capacity and first startup
 
-Use a Linux amd64 host with SSD storage. Start with 4 CPU cores, 16 GiB RAM,
+Use a Linux amd64 or arm64 host with SSD storage. Start with 4 CPU cores, 16 GiB RAM,
 and a dedicated 1 TB data volume; workload and future chain growth can require
 more. On Docker Desktop, these resources must be allocated to Docker's VM.
-Use Linux containers and WSL 2 on Windows. The image has no native arm64 build;
-Apple Silicon requires `--platform linux/amd64` (already set by Compose).
-Full-mainnet operation under emulation has not been validated.
+Use Linux containers and WSL 2 on Windows. Docker and Compose select the native
+architecture automatically; Apple Silicon uses the ARM64 image without amd64
+emulation. The images run the Linux services inside Docker's VM on macOS and
+Windows, rather than building native services for those operating systems.
+
+CI runs fixture and bundled-binary tests natively on both Linux architectures.
+A full mainnet restore has only been validated on Linux amd64. ARM64 and
+Docker Desktop full-mainnet acceptance is still pending. The pinned Zakura
+image does not support other CPU architectures.
 
 On 14 November 2026, the published Zakura archive was about 275 GB compressed,
 and the lightwalletd archive was about 24.6 GB. Initial bootstrap downloads
@@ -185,7 +191,7 @@ ownership of unrelated host files.
 Provide a certificate for your hostname and a key readable by UID `10001`:
 
 ```bash
-docker run -d --platform linux/amd64 \
+docker run -d \
   --name zovereign \
   --restart unless-stopped \
   --stop-timeout 120 \
