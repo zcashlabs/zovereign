@@ -32,8 +32,15 @@ manually.
 
 ## Deploy
 
-Upload the contents of `dist/` to any static host. All asset paths are
-relative, so the site also works from a subdirectory.
+The public site is hosted on **[GitHub Pages](https://zcashlabs.github.io/zovereign/)**.
+[The website workflow](../.github/workflows/website.yml) checks JavaScript,
+uploads `website/dist/`, and deploys it whenever website files change on
+`main`. It can also be run manually from the repository's Actions tab.
+No hosting credentials or build step are needed.
+
+All asset paths are relative, so the site works under GitHub Pages' `/zovereign/`
+path. To use another static host, upload the contents of `dist/` and update the
+canonical and Open Graph URLs in `index.html`.
 
 ## Editing guidelines
 

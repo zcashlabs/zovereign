@@ -4,6 +4,8 @@ Run your own Zcash mainnet infrastructure in **one Docker container**: an
 archive Zakura node and lightwalletd, both bootstrapped from published snapshots.
 lightwalletd connects to the RPC on your bundled Zakura node.
 
+**[Visit the website](https://zcashlabs.github.io/zovereign/)**
+
 ## Quick start
 
 Install Docker with the Compose plugin, then run:

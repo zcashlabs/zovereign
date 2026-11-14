@@ -20,6 +20,7 @@ CONTRIBUTING.md, and docs/single-container.md first.
   Keep installation commands aligned with README.md, benchmark claims dated,
   and the snapshot trust boundary clear. Check JavaScript with
   `node --check website/dist/site.js`; serve it using website/README.md.
+  `.github/workflows/website.yml` deploys it to GitHub Pages on changes to `main`.
 - `scripts/` and `deploy/digitalocean/`: separate snapshot publisher tooling.
   Do not change that infrastructure incidentally while editing the combined image.
 
