@@ -72,7 +72,7 @@ strong { font-weight: 650; }
   line-height: 1.02; letter-spacing: -.02em; margin: 0 0 .4em; max-width: 18ch; text-wrap: balance;
 }
 .lede { font-size: clamp(1.06rem, 1.5vw, 1.25rem); line-height: 1.55; max-width: 38em; color: var(--ink-2); margin: 0 0 1.6em; }
-.kicker, .sec-no, .step-no, .report-k, .fig-no {
+.kicker, .sec-no, .step-no, .report-k {
   font: 600 .74rem/1.3 var(--f-mono); letter-spacing: .14em; text-transform: uppercase;
 }
 .kicker { display: inline-flex; align-items: center; gap: .6em; margin: 0 0 1.6em; color: var(--green); }
@@ -158,8 +158,6 @@ strong { font-weight: 650; }
 .spec-plate dd { margin: 4px 0 0; font: 600 .9rem/1.25 var(--f-sans); }
 .hero-fig { margin: 0; }
 .stack-illustration { width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto; }
-figcaption { font-size: .86rem; color: var(--muted); margin-top: 10px; display: flex; gap: .8em; align-items: baseline; }
-.fig-no { color: var(--ink); white-space: nowrap; }
 
 /* One box, two services, direct wallet connections. */
 .stack-box { fill: var(--paper-2); stroke: var(--ink); stroke-width: 2.5; }
@@ -262,8 +260,6 @@ figcaption { font-size: .86rem; color: var(--muted); margin-top: 10px; display: 
 .inside-grid { display: grid; grid-template-columns: 1fr; gap: 40px; }
 .blueprint { margin: 0; border: 1.5px solid rgba(242,236,223,.35); border-radius: var(--radius); padding: clamp(8px, 1.5vw, 18px); background: var(--green); }
 .blueprint svg { display: block; width: 100%; height: auto; }
-.blueprint figcaption { color: var(--ivory-dim); }
-.blueprint .fig-no { color: var(--gold); }
 .bp-grid { fill: none; stroke: rgba(242,236,223,.07); stroke-width: 1; }
 .bp-hull { fill: rgba(21,54,41,.55); stroke: var(--paper); stroke-width: 1.6; stroke-dasharray: 10 7; }
 .bp-cap { font: 600 11px/1 var(--f-mono); letter-spacing: .12em; fill: var(--gold); }

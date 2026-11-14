@@ -73,10 +73,10 @@
     <div class="hero-copy">
       <p class="kicker"><span class="dot" aria-hidden="true"></span> Self-hosted Zcash infrastructure · one Docker image</p>
       <h1 id="hero-title" class="display">Run your own Zcash stack.</h1>
-      <p class="lede">Zovereign lets you run your own <strong>lightwalletd</strong> and <strong>Zcash archive full node</strong> with a single command. Connect your wallets directly to your own infrastructure, transact without relying on a third-party RPC provider, and build privacy-focused applications on top.</p>
+      <p class="lede">Zovereign lets you run <strong>lightwalletd</strong> and a <strong>Zcash archive full node</strong> with one command. Connect your wallets to your own infrastructure, transact without a third-party RPC provider, and build privacy-focused apps.</p>
       <div class="hero-actions">
-        <a class="btn btn-gold" href="#install">Get the one-liner <span aria-hidden="true">→</span></a>
-        <a class="btn btn-ghost" href="#how">See how it boots</a>
+        <a class="btn btn-gold" href="#install">Get started <span aria-hidden="true">→</span></a>
+        <a class="btn btn-ghost" href="#how">How it works</a>
       </div>
       <dl class="spec-plate" aria-label="Bundled versions">
         <div><dt>Node</dt><dd>Zakura 1.8.7</dd></div>
@@ -121,7 +121,7 @@
         </g>
         <text class="stack-wallet-label" x="300" y="562" text-anchor="middle">Your Zcash wallets</text>
       </svg>
-      <figcaption><span class="fig-no">Fig. 1</span> One box. Both services. Your wallets connect directly.</figcaption>
+
     </figure>
   </div>
 </section>
@@ -233,7 +233,7 @@
     <div class="inside-grid">
       <figure class="blueprint">
         <svg viewBox="0 0 1000 560" role="img" aria-labelledby="bp-t bp-d">
-          <title id="bp-t">Fig. 2: Blueprint of the Zovereign container</title>
+          <title id="bp-t">Blueprint of the Zovereign container</title>
           <desc id="bp-d">Inside the container boundary, Tini handles PID 1 and a Python supervisor manages the Zakura node and lightwalletd. They are joined by private RPC on 127.0.0.1:8232. Both store data in the zovereign-data volume. Port 8233 connects Zakura to Zcash peers outside. Port 9067 connects lightwalletd to a wallet on the host's loopback, or to a remote wallet through a tunnel or TLS.</desc>
           <defs>
             <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" class="bp-grid"/></pattern>
@@ -306,7 +306,7 @@
             <circle cx="764" cy="286" r="14" class="bp-num"/><text x="764" y="291" class="bp-numt">7</text>
           </g>
         </svg>
-        <figcaption><span class="fig-no">Fig. 2</span> Blueprint. Hover or focus a part in the legend below to trace it.</figcaption>
+
       </figure>
 
       <ol class="legend" aria-label="Parts of the container">

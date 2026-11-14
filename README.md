@@ -1,5 +1,7 @@
 # Zovereign
 
+<img src="assets/zovereign-logo.png" alt="Zovereign logo" width="396">
+
 Run your own Zcash mainnet infrastructure in **one Docker container**: an
 archive Zakura node and lightwalletd, both bootstrapped from published snapshots.
 lightwalletd connects to the RPC on your bundled Zakura node.
