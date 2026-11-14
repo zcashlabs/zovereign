@@ -75,6 +75,7 @@ review manifest compatibility checks, run tests, and document validation.
 | `docker/stack.py` | Bootstrap, validation, supervision, and health checks. |
 | `tests/test_stack.py` | Small offline fixtures and bundled-binary regressions. |
 | `tests/accept_mainnet.py` | Opt-in check of a real running mainnet deployment. |
+| `website/` | Static landing page, illustrations, and local preview instructions. |
 | `scripts/` | Standalone snapshot creation, restore, and publication. |
 | `deploy/digitalocean/`, `infra/digitalocean/` | Source publisher deployment. |
 

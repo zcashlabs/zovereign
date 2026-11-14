@@ -105,6 +105,8 @@ run `docker compose up -d --build` to apply changes.
 - [Contributing](CONTRIBUTING.md): build and run the small fixture tests without
   downloading the blockchain, plus image publication instructions.
 - [Agent instructions](AGENTS.md): repository map and implementation invariants.
+- [Website source](website/README.md): the illustrated landing page and local
+  preview instructions.
 - [Snapshot creation and publishing](docs/snapshot-publishing.md): maintain the
   publisher or restore standalone lightwalletd against an existing RPC server.
 

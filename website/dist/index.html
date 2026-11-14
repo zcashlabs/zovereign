@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zovereign — Your own Zcash stack, in one container</title>
+<meta name="description" content="Zovereign restores a Zcash mainnet archive node and lightwalletd from published snapshots and runs them together in one Docker container. No RPC provider, no credentials, no rebuilding history from the network.">
+<meta name="theme-color" content="#f2ecdf">
+<meta property="og:title" content="Zovereign — Your own Zcash stack, in one container">
+<meta property="og:description" content="A Zakura archive node and lightwalletd, restored from snapshots and supervised as a pair. One docker run.">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..800;1,9..144,400..600&family=Instrument+Sans:wght@400..700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead" id="top">
+  <div class="wrap masthead-row">
+    <a class="brand" href="#top" aria-label="Zovereign home">
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <polygon class="bm-t" points="20,3 36,12 20,21 4,12"/>
+        <polygon class="bm-l" points="4,12 20,21 20,37 4,28"/>
+        <polygon class="bm-r" points="36,12 20,21 20,37 36,28"/>
+        <line class="bm-s" x1="4" y1="20" x2="20" y2="29"/><line class="bm-s" x1="20" y1="29" x2="36" y2="20"/>
+      </svg>
+      <span class="brand-word">Zovereign</span>
+    </a>
+    <nav class="nav-desktop" aria-label="Primary">
+      <ul>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#inside">Inside</a></li>
+        <li><a href="#evidence">Evidence</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+    </nav>
+    <div class="masthead-cta">
+      <a class="btn btn-ghost btn-sm gh" href="https://github.com/zcashlabs/zovereign">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>Source</span>
+      </a>
+      <a class="btn btn-ink btn-sm" href="#install">Run it</a>
+    </div>
+    <details class="nav-mobile">
+      <summary aria-label="Open menu"><span class="burger" aria-hidden="true"><i></i><i></i></span><span class="sr">Menu</span></summary>
+      <nav aria-label="Mobile">
+        <ul>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#inside">Inside the box</a></li>
+          <li><a href="#evidence">Evidence</a></li>
+          <li><a href="#install">Install</a></li>
+          <li><a href="#trust">Trust</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="https://github.com/zcashlabs/zovereign">Source on GitHub ↗</a></li>
+        </ul>
+      </nav>
+    </details>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============ HERO ============ -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="kicker"><span class="dot" aria-hidden="true"></span> Self-hosted Zcash infrastructure · one Docker image</p>
+      <h1 id="hero-title" class="display">Run your own Zcash stack. <em>No landlord.</em></h1>
+      <p class="lede">Zovereign restores a mainnet <strong>archive node</strong> and <strong>lightwalletd</strong> from published snapshots, wires them together over a private loopback RPC, and hands your wallet a gRPC endpoint on your own machine. One container. One volume. Nobody else’s server in the middle.</p>
+      <div class="hero-actions">
+        <a class="btn btn-gold" href="#install">Get the one-liner <span aria-hidden="true">→</span></a>
+        <a class="btn btn-ghost" href="#how">See how it boots</a>
+      </div>
+      <dl class="spec-plate" aria-label="Bundled versions">
+        <div><dt>Node</dt><dd>Zakura 1.8.7</dd></div>
+        <div><dt>Mode</dt><dd>Archive · DB 30</dd></div>
+        <div><dt>Wallet server</dt><dd>lightwalletd v0.6.0</dd></div>
+        <div><dt>Platform</dt><dd>linux/amd64</dd></div>
+      </dl>
+    </div>
+    <figure class="hero-fig">
+      <svg class="iso" viewBox="0 0 720 650" role="img" aria-labelledby="fig1-t fig1-d">
+        <title id="fig1-t">Fig. 1: Zovereign, exploded view</title>
+        <desc id="fig1-d">An isometric drawing of one dashed container holding three stacked layers: a persistent data volume at the bottom, the Zakura archive node in the middle, and lightwalletd on top, joined by a private loopback RPC pipe. Two snapshot crates descend into the container from above. Port 8233 for peers and port 9067 for wallets protrude from the right side.</desc>
+        <defs>
+          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><line x1="0" y1="0" x2="0" y2="6" class="hatch-line"/></pattern>
+        </defs>
+        <g class="hull-back">
+        <line class="hull" x1="330.0" y1="405.2" x2="554.8" y2="535.0"/>
+        <line class="hull" x1="330.0" y1="405.2" x2="162.3" y2="502.0"/>
+        <line class="hull" x1="330.0" y1="405.2" x2="330.0" y2="143.4"/>
+        </g>
+        <polygon class="shadow" points="330.0,405.2 554.8,535.0 387.2,631.8 162.3,502.0"/>
+        <g class="part" data-part="volume">
+        <polygon class="vol-r" points="520.5,524.0 387.2,601.0 387.2,561.4 520.5,484.4"/><polygon class="vol-l" points="196.6,491.0 387.2,601.0 387.2,561.4 196.6,451.4"/><polygon class="vol-t" points="330.0,374.4 520.5,484.4 387.2,561.4 196.6,451.4"/>
+        <polygon class="disk" points="408.1,496.5 401.2,500.0 393.6,502.9 385.4,505.3 376.7,507.0 367.7,508.0 358.6,508.3 349.4,508.0 340.4,507.0 331.8,505.3 323.6,502.9 315.9,500.0 309.0,496.5 303.0,492.5 297.9,488.1 293.9,483.4 290.9,478.4 289.1,473.2 288.5,467.9 289.1,462.6 290.9,457.4 293.9,452.4 297.9,447.7 303.0,443.3 309.0,439.3 315.9,435.8 323.6,432.9 331.8,430.5 340.4,428.8 349.4,427.8 358.6,427.5 367.7,427.8 376.7,428.8 385.4,430.5 393.6,432.9 401.2,435.8 408.1,439.3 414.2,443.3 419.2,447.7 423.3,452.4 426.2,457.4 428.0,462.6 428.6,467.9 428.0,473.2 426.2,478.4 423.3,483.4 419.2,488.1 414.2,492.5"/>
+        <polygon class="disk" points="394.8,488.8 389.7,491.3 384.2,493.5 378.2,495.2 371.8,496.4 365.3,497.2 358.6,497.5 351.9,497.2 345.3,496.4 339.0,495.2 333.0,493.5 327.4,491.3 322.4,488.8 318.0,485.9 314.2,482.7 311.3,479.2 309.1,475.5 307.8,471.8 307.4,467.9 307.8,464.0 309.1,460.3 311.3,456.6 314.2,453.1 318.0,449.9 322.4,447.0 327.4,444.5 333.0,442.3 339.0,440.6 345.3,439.4 351.9,438.6 358.6,438.3 365.3,438.6 371.8,439.4 378.2,440.6 384.2,442.3 389.7,444.5 394.8,447.0 399.2,449.9 402.9,453.1 405.9,456.6 408.0,460.3 409.3,464.0 409.8,467.9 409.3,471.8 408.0,475.5 405.9,479.2 402.9,482.7 399.2,485.9"/>
+        <polygon class="disk" points="381.4,481.1 378.3,482.7 374.7,484.1 371.0,485.1 366.9,485.9 362.8,486.4 358.6,486.6 354.4,486.4 350.2,485.9 346.2,485.1 342.4,484.1 338.9,482.7 335.7,481.1 332.9,479.3 330.6,477.2 328.7,475.0 327.3,472.7 326.5,470.3 326.2,467.9 326.5,465.5 327.3,463.1 328.7,460.8 330.6,458.6 332.9,456.5 335.7,454.7 338.9,453.1 342.4,451.7 346.2,450.7 350.2,449.9 354.4,449.4 358.6,449.2 362.8,449.4 366.9,449.9 371.0,450.7 374.7,451.7 378.3,453.1 381.4,454.7 384.2,456.5 386.6,458.6 388.5,460.8 389.8,463.1 390.6,465.5 390.9,467.9 390.6,470.3 389.8,472.7 388.5,475.0 386.6,477.2 384.2,479.3"/>
+        <polygon class="disk" points="368.1,473.4 366.8,474.1 365.3,474.6 363.7,475.1 362.1,475.4 360.3,475.6 358.6,475.7 356.8,475.6 355.1,475.4 353.4,475.1 351.8,474.6 350.4,474.1 349.1,473.4 347.9,472.6 346.9,471.8 346.1,470.9 345.6,469.9 345.2,468.9 345.1,467.9 345.2,466.9 345.6,465.9 346.1,464.9 346.9,464.0 347.9,463.2 349.1,462.4 350.4,461.7 351.8,461.2 353.4,460.7 355.1,460.4 356.8,460.2 358.6,460.1 360.3,460.2 362.1,460.4 363.7,460.7 365.3,461.2 366.8,461.7 368.1,462.4 369.3,463.2 370.2,464.0 371.0,464.9 371.6,465.9 371.9,466.9 372.1,467.9 371.9,468.9 371.6,469.9 371.0,470.9 370.2,471.8 369.3,472.6"/>
+        <line class="vol-rule" x1="202.3" y1="484.4" x2="381.4" y2="587.8"/>
+        <line class="vol-rule" x1="202.3" y1="474.5" x2="381.4" y2="577.9"/>
+        <line class="vol-rule" x1="202.3" y1="464.6" x2="381.4" y2="568.0"/>
+        <text class="face-txt light" transform="matrix(0.8660,0.5,0,1,206.2,482.9)">zovereign-data → /data</text>
+        </g>
+        <line class="pipe-bg" x1="238.5" y1="453.6" x2="238.5" y2="427.2"/>
+        <line class="pipe-bg" x1="257.6" y1="464.6" x2="257.6" y2="438.2"/>
+        <g class="part" data-part="zakura">
+        <polygon class="zak-r" points="520.5,458.0 387.2,535.0 387.2,460.2 520.5,383.2"/><polygon class="zak-l" points="196.6,425.0 387.2,535.0 387.2,460.2 196.6,350.2"/><polygon class="zak-t" points="330.0,273.2 520.5,383.2 387.2,460.2 196.6,350.2"/>
+        <polygon class="blk-r" points="259.5,346.9 236.6,360.1 236.6,346.9 259.5,333.7"/><polygon class="blk-l" points="219.5,350.2 236.6,360.1 236.6,346.9 219.5,337.0"/><polygon class="blk-t" points="242.4,323.8 259.5,333.7 236.6,346.9 219.5,337.0"/>
+        <line class="chain" x1="248.1" y1="346.9" x2="258.6" y2="353.0"/>
+        <polygon class="blk-r" points="287.1,362.8 264.3,376.1 264.3,362.9 287.1,349.6"/><polygon class="blk-l" points="247.1,366.1 264.3,376.1 264.3,362.9 247.1,352.9"/><polygon class="blk-t" points="270.0,339.8 287.1,349.6 264.3,362.9 247.1,352.9"/>
+        <line class="chain" x1="275.7" y1="362.9" x2="286.2" y2="368.9"/>
+        <polygon class="blk-r" points="314.8,378.8 291.9,392.0 291.9,378.8 314.8,365.6"/><polygon class="blk-l" points="274.7,382.1 291.9,392.0 291.9,378.8 274.7,368.9"/><polygon class="blk-t" points="297.6,355.7 314.8,365.6 291.9,378.8 274.7,368.9"/>
+        <line class="chain" x1="303.3" y1="378.8" x2="313.8" y2="384.9"/>
+        <polygon class="blk-r" points="342.4,394.7 319.5,407.9 319.5,394.8 342.4,381.5"/><polygon class="blk-l" points="302.4,398.1 319.5,407.9 319.5,394.8 302.4,384.9"/><polygon class="blk-t" points="325.2,371.6 342.4,381.5 319.5,394.8 302.4,384.9"/>
+        <line class="chain" x1="331.0" y1="394.8" x2="341.4" y2="400.8"/>
+        <polygon class="blk-r" points="370.0,410.7 347.1,423.9 347.1,410.7 370.0,397.5"/><polygon class="blk-l" points="330.0,414.0 347.1,423.9 347.1,410.7 330.0,400.8"/><polygon class="blk-t" points="352.9,387.6 370.0,397.5 347.1,410.7 330.0,400.8"/>
+        <polygon class="panel" points="206.2,419.5 316.7,483.3 316.7,430.5 206.2,366.7"/>
+        <text class="face-txt big" transform="matrix(0.8660,0.5,0,1,212.8,390.4)">ZAKURA 1.8.7</text>
+        <text class="face-txt" transform="matrix(0.8660,0.5,0,1,212.8,409.1)">ARCHIVE · DB 30</text>
+        <line class="led on" x1="330.0" y1="464.6" x2="334.8" y2="467.4"/>
+        <line class="led" x1="340.5" y1="470.6" x2="345.2" y2="473.4"/>
+        <line class="led" x1="351.0" y1="476.7" x2="355.7" y2="479.5"/>
+        <line class="led" x1="361.4" y1="482.8" x2="366.2" y2="485.5"/>
+        <line class="led" x1="371.9" y1="488.8" x2="376.7" y2="491.6"/>
+        <line class="vent" x1="509.1" y1="451.4" x2="509.1" y2="403.0"/>
+        <line class="vent" x1="502.4" y1="455.3" x2="502.4" y2="406.9"/>
+        <line class="vent" x1="495.8" y1="459.1" x2="495.8" y2="410.7"/>
+        <line class="vent" x1="489.1" y1="462.9" x2="489.1" y2="414.5"/>
+        <line class="vent" x1="482.4" y1="466.8" x2="482.4" y2="418.4"/>
+        <line class="vent" x1="475.8" y1="470.7" x2="475.8" y2="422.2"/>
+        </g>
+        <g class="part" data-part="rpc">
+        <line class="pipe-bg" x1="387.2" y1="438.2" x2="387.2" y2="389.8"/>
+        <line class="pipe-flow" x1="387.2" y1="438.2" x2="387.2" y2="389.8"/>
+        </g>
+        <g class="part" data-part="lwd">
+        <polygon class="lwd-r" points="520.5,334.8 387.2,411.8 387.2,376.6 520.5,299.6"/><polygon class="lwd-l" points="196.6,301.8 387.2,411.8 387.2,376.6 196.6,266.6"/><polygon class="lwd-t" points="330.0,189.6 520.5,299.6 387.2,376.6 196.6,266.6"/>
+        <polygon class="card" points="330.0,207.2 354.8,221.5 330.0,235.8 305.2,221.5"/>
+        <polygon class="card" points="363.3,226.5 388.1,240.8 363.3,255.1 338.6,240.8"/>
+        <polygon class="card" points="396.7,245.7 421.5,260.0 396.7,274.3 371.9,260.0"/>
+        <polygon class="card" points="430.0,265.0 454.8,279.2 430.0,293.6 405.3,279.2"/>
+        <polygon class="card" points="463.4,284.2 488.1,298.5 463.4,312.8 438.6,298.5"/>
+        <polygon class="card" points="293.8,228.1 318.6,242.4 293.8,256.7 269.0,242.4"/>
+        <polygon class="card" points="327.1,247.4 351.9,261.7 327.1,276.0 302.4,261.7"/>
+        <polygon class="card" points="360.5,266.6 385.3,280.9 360.5,295.2 335.7,280.9"/>
+        <polygon class="card" points="393.8,285.9 418.6,300.1 393.8,314.5 369.1,300.1"/>
+        <polygon class="card" points="427.2,305.1 451.9,319.4 427.2,333.7 402.4,319.4"/>
+        <polygon class="card" points="257.6,249.0 282.4,263.3 257.6,277.6 232.8,263.3"/>
+        <polygon class="card" points="290.9,268.2 315.7,282.6 290.9,296.9 266.2,282.6"/>
+        <polygon class="card" points="324.3,287.5 349.1,301.8 324.3,316.1 299.5,301.8"/>
+        <polygon class="card" points="357.6,306.8 382.4,321.1 357.6,335.4 332.9,321.1"/>
+        <polygon class="card" points="391.0,326.0 415.7,340.3 391.0,354.6 366.2,340.3"/>
+        <text class="face-txt big ink" transform="matrix(0.8660,0.5,0,1,206.2,297.4)">LIGHTWALLETD v0.6.0</text>
+        </g>
+        <g class="part" data-part="p2p">
+        <polygon class="port-g-r" points="512.9,491.0 493.9,502.0 493.9,484.4 512.9,473.4"/><polygon class="port-g-l" points="444.3,473.4 493.9,502.0 493.9,484.4 444.3,455.8"/><polygon class="port-g-t" points="463.4,444.8 512.9,473.4 493.9,484.4 444.3,455.8"/>
+        <text class="port-txt light" transform="matrix(0.8660,-0.5,0,1,493.9,498.7)">8233</text>
+        </g>
+        <g class="part" data-part="grpc">
+        <polygon class="port-y-r" points="512.9,387.6 493.9,398.6 493.9,381.0 512.9,370.0"/><polygon class="port-y-l" points="444.3,370.0 493.9,398.6 493.9,381.0 444.3,352.4"/><polygon class="port-y-t" points="463.4,341.4 512.9,370.0 493.9,381.0 444.3,352.4"/>
+        <text class="port-txt" transform="matrix(0.8660,-0.5,0,1,493.9,395.3)">9067</text>
+        </g>
+        <g class="hull-front">
+        <line class="hull" x1="554.8" y1="535.0" x2="387.2" y2="631.8"/>
+        <line class="hull" x1="162.3" y1="502.0" x2="387.2" y2="631.8"/>
+        <line class="hull" x1="387.2" y1="631.8" x2="387.2" y2="370.0"/>
+        <line class="hull" x1="554.8" y1="535.0" x2="554.8" y2="273.2"/>
+        <line class="hull" x1="162.3" y1="502.0" x2="162.3" y2="240.2"/>
+        <line class="hull" x1="330.0" y1="143.4" x2="554.8" y2="273.2"/>
+        <line class="hull" x1="330.0" y1="143.4" x2="162.3" y2="240.2"/>
+        <line class="hull" x1="554.8" y1="273.2" x2="387.2" y2="370.0"/>
+        <line class="hull" x1="162.3" y1="240.2" x2="387.2" y2="370.0"/>
+        </g>
+        <g class="crate c1"><polygon class="crA-r" points="448.1,134.6 402.4,161.0 402.4,108.2 448.1,81.8"/><polygon class="crA-l" points="356.7,134.6 402.4,161.0 402.4,108.2 356.7,81.8"/><polygon class="crA-t" points="402.4,55.4 448.1,81.8 402.4,108.2 356.7,81.8"/><line class="strap" x1="379.5" y1="147.8" x2="379.5" y2="95.0"/><line class="strap" x1="425.3" y1="147.8" x2="425.3" y2="95.0"/>
+        <line class="drop" x1="402.4" y1="134.6" x2="402.4" y2="156.6"/></g>
+        <g class="crate c2"><polygon class="crB-r" points="533.9,201.7 505.3,218.2 505.3,185.2 533.9,168.7"/><polygon class="crB-l" points="476.7,201.7 505.3,218.2 505.3,185.2 476.7,168.7"/><polygon class="crB-t" points="505.3,152.2 533.9,168.7 505.3,185.2 476.7,168.7"/><line class="strap" x1="491.0" y1="209.9" x2="491.0" y2="176.9"/><line class="strap" x1="519.6" y1="209.9" x2="519.6" y2="176.9"/>
+        <line class="drop" x1="505.3" y1="201.7" x2="505.3" y2="219.3"/></g>
+        <g class="iso-labels" aria-hidden="true">
+          <g class="lbl"><path d="M196 56 H330 L366 84"/><circle cx="366" cy="84" r="3"/><text x="20" y="50" class="lbl-k">Archive snapshot</text><text x="20" y="66">Zakura · ≈275 GB</text></g>
+          <g class="lbl"><path d="M580 158 H560 L530 172"/><circle cx="530" cy="172" r="3"/><text x="586" y="152" class="lbl-k">Block cache</text><text x="586" y="168">lwd · ≈25 GB</text></g>
+          <g class="lbl"><path d="M150 224 L162 240"/><circle cx="162" cy="240" r="3"/><text x="20" y="214" class="lbl-k">One container</text><text x="20" y="230">runs as UID 10001</text></g>
+          <g class="lbl"><path d="M140 300 H196"/><circle cx="196" cy="300" r="3"/><text x="20" y="296" class="lbl-k">lightwalletd</text><text x="20" y="312">compact blocks</text></g>
+          <g class="lbl"><path d="M140 388 H196"/><circle cx="196" cy="388" r="3"/><text x="20" y="384" class="lbl-k">Zakura node</text><text x="20" y="400">mainnet archive</text></g>
+          <g class="lbl"><path d="M140 472 H196"/><circle cx="196" cy="472" r="3"/><text x="20" y="468" class="lbl-k">zovereign-data</text><text x="20" y="484">survives upgrades</text></g>
+          <g class="lbl"><path d="M580 364 H530 L512 382"/><circle cx="512" cy="382" r="3"/><text x="586" y="358" class="lbl-k">:9067 gRPC</text><text x="586" y="374">host loopback</text></g>
+          <g class="lbl"><path d="M580 424 H420 L396 412"/><circle cx="396" cy="412" r="3"/><text x="586" y="418" class="lbl-k">:8232 RPC</text><text x="586" y="434">never leaves</text></g>
+          <g class="lbl"><path d="M580 492 H512"/><circle cx="512" cy="490" r="3"/><text x="586" y="486" class="lbl-k">:8233 P2P</text><text x="586" y="502">Zcash peers</text></g>
+        </g>
+      </svg>
+      <figcaption><span class="fig-no">Fig. 1</span> The whole stack, exploded. In real life it is one container you start with one command.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ LEDGER ============ -->
+<section class="ledger-sec" aria-labelledby="ledger-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-no">§ 01</p>
+      <h2 id="ledger-title" class="h2">Things you can stop doing.</h2>
+      <p class="sec-intro">Running Zcash wallet infrastructure used to mean a weekend of glue. Zovereign does the glue, and does it the same way every time.</p>
+    </div>
+    <ol class="ledger">
+      <li><s>Renting an RPC endpoint from someone else and hoping it stays up and stays honest about tip height.</s><span class="now">Your wallet server talks to <em>your</em> node, over loopback, inside one container.</span></li>
+      <li><s>Rebuilding years of chain history block by block before anything is useful.</s><span class="now">A published archive snapshot restores that history; the node only processes what came after.</span></li>
+      <li><s>Hand-writing RPC credentials and wiring two daemons that must start in the right order.</s><span class="now">No credentials to manage. lightwalletd waits until Zakura is near tip, then starts.</span></li>
+      <li><s>Restarting a 275 GB download because the Wi-Fi blinked.</s><span class="now">Range downloads resume from committed bytes, pinned to the same snapshot.</span></li>
+      <li><s>Calling it “healthy” because a port is open.</s><span class="now">Healthy means lightwalletd just served a real compact block from your node.</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="how" id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-no">§ 02</p>
+      <h2 id="how-title" class="h2">From two crates of history to a block in your wallet.</h2>
+      <p class="sec-intro">On first boot, Zovereign turns about 300 GB of compressed snapshots into a running node and wallet server. Every step is checked, resumable and boring in the best way. Here is the actual sequence.</p>
+    </div>
+
+    <div class="pipeline" aria-hidden="true">
+      <svg viewBox="0 0 1100 156" class="pipe-svg" preserveAspectRatio="xMidYMid meet">
+        <g class="pl-crate"><polygon points="40,52 82,30 124,52 82,74" class="crA-t"/><polygon points="40,52 82,74 82,122 40,100" class="crA-l"/><polygon points="124,52 82,74 82,122 124,100" class="crA-r"/><line x1="61" y1="63" x2="61" y2="111" class="strap"/><line x1="103" y1="63" x2="103" y2="111" class="strap"/></g>
+        <g class="pl-crate"><polygon points="140,72 166,58 192,72 166,86" class="crB-t"/><polygon points="140,72 166,86 166,116 140,102" class="crB-l"/><polygon points="192,72 166,86 166,116 192,102" class="crB-r"/></g>
+        <path class="pl-track" d="M210 92 H930"/>
+        <path class="pl-flow" d="M210 92 H930"/>
+        <g class="pl-chunks"><rect x="236" y="84" width="26" height="16" rx="2"/><rect x="270" y="84" width="26" height="16" rx="2"/><rect x="304" y="84" width="26" height="16" rx="2" class="ghost"/></g>
+        <g class="pl-gate"><rect x="430" y="56" width="74" height="72" rx="8"/><text x="467" y="88" text-anchor="middle">SHA</text><text x="467" y="106" text-anchor="middle">256</text></g>
+        <g class="pl-stage"><rect x="590" y="60" width="96" height="64" rx="6"/><text x="638" y="97" text-anchor="middle">staging/</text></g>
+        <g class="pl-node"><rect x="770" y="50" width="70" height="84" rx="6" class="zak"/><rect x="852" y="50" width="70" height="84" rx="6" class="lwd"/><line x1="840" y1="92" x2="852" y2="92" class="pl-rpc"/></g>
+        <text x="826" y="98" class="pl-in" text-anchor="middle">RPC</text>
+        <g class="pl-cap"><text x="116" y="146">snapshots</text><text x="283" y="146">ranges</text><text x="467" y="146">verify</text><text x="638" y="146">stage</text><text x="846" y="146">node + lwd</text><text x="1035" y="146">healthy</text></g>
+        <g class="pl-out"><path d="M932 92 H1000"/><rect x="1004" y="64" width="62" height="56" rx="10"/><rect x="1018" y="80" width="34" height="22" rx="3" class="blk"/><path d="M1026 92 l5 5 l10 -11" class="tick"/></g>
+      </svg>
+    </div>
+
+    <ol class="steps">
+      <li class="step">
+        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="14" y="10" width="32" height="44" rx="3" class="g-paper"/><path d="M20 22h20M20 30h20M20 38h12" class="g-ink"/><circle cx="44" cy="14" r="7" class="g-gold"/><path d="M44 21v12" class="g-ink"/></svg>
+        <p class="step-no">01 · Pin</p>
+        <h3>Pick a snapshot and stick to it.</h3>
+        <p>The latest compatible mainnet archive is chosen from the Zakura manifest, and the latest lightwalletd cache from its own. Each choice is pinned to disk, so a restart finishes the same snapshot even if “latest” moves.</p>
+      </li>
+      <li class="step">
+        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="14" width="48" height="8" rx="2" class="g-green"/><rect x="8" y="27" width="48" height="8" rx="2" class="g-green"/><rect x="8" y="40" width="30" height="8" rx="2" class="g-gold"/><rect x="38" y="40" width="18" height="8" rx="2" class="g-paper"/><path d="M50 52v8m-4-4l4 4 4-4" class="g-ink"/></svg>
+        <p class="step-no">02 · Fetch</p>
+        <h3>Download in checked ranges.</h3>
+        <p>256 MiB HTTP ranges, parallel connections and retries. Offsets and sizes are verified and bytes commit in order to a <code>.part</code> file, so an interruption costs you minutes, not the whole download.</p>
+      </li>
+      <li class="step">
+        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6l6 5 8-1 2 8 7 4-3 7 3 7-7 4-2 8-8-1-6 5-6-5-8 1-2-8-7-4 3-7-3-7 7-4 2-8 8 1z" class="g-gold"/><path d="M23 32l6 6 12-13" class="g-ink thick"/></svg>
+        <p class="step-no">03 · Verify</p>
+        <h3>Hash every byte.</h3>
+        <p>The complete compressed archive must match its SHA-256 before anything is unpacked. A mismatch throws the archive away instead of handing your node a corrupt history.</p>
+      </li>
+      <li class="step">
+        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="26" width="48" height="30" rx="3" class="g-dash"/><path d="M16 26l6-14h20l6 14" class="g-ink"/><rect x="20" y="34" width="10" height="10" class="g-green"/><rect x="34" y="34" width="10" height="10" class="g-gold"/></svg>
+        <p class="step-no">04 · Stage</p>
+        <h3>Unpack somewhere safe first.</h3>
+        <p>Extraction goes into a staging directory. Only regular files under the expected paths are accepted: no traversal, links or special files. The validated result is renamed into place, never sprayed over existing data.</p>
+      </li>
+      <li class="step">
+        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="12" y="12" width="40" height="40" rx="6" class="g-paper"/><text x="32" y="37" text-anchor="middle" class="g-txt">10001</text><path d="M18 18l28 28" class="g-ink faint"/></svg>
+        <p class="step-no">05 · Drop root</p>
+        <h3>Give up the keys to the building.</h3>
+        <p>The volume is locked against a second node, then bootstrap, Zakura and lightwalletd all run as UID/GID 10001. Nothing that talks to the network keeps root.</p>
+      </li>
+      <li class="step">
+        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="30" width="12" height="12" class="g-green"/><rect x="22" y="30" width="12" height="12" class="g-green"/><rect x="38" y="30" width="12" height="12" class="g-gold"/><path d="M18 36h4M34 36h4" class="g-ink"/><path d="M56 42V12l-6 4 6 4" class="g-ink"/></svg>
+        <p class="step-no">06 · Catch up</p>
+        <h3>Node first. Wait for the tip.</h3>
+        <p>Zakura starts in mainnet archive mode and must answer RPC within five blocks of its estimated network tip before anything else happens. It only has to process blocks newer than the snapshot.</p>
+      </li>
+      <li class="step">
+        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="10" width="44" height="44" rx="10" class="g-ink-fill"/><rect x="20" y="22" width="24" height="18" rx="2" class="g-gold"/><path d="M25 31l4 4 9-9" class="g-ink thick"/></svg>
+        <p class="step-no">07 · Serve</p>
+        <h3>Then the wallet server. Then proof.</h3>
+        <p>lightwalletd starts against loopback RPC with its compact-block cache already populated. Docker reports <code>healthy</code> only after it serves an actual block from one behind your node’s tip.</p>
+      </li>
+      <li class="step step-coda">
+        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><path d="M48 22a18 18 0 1 0 3 14" class="g-ink thick"/><path d="M50 10v13H37" class="g-ink thick"/><circle cx="32" cy="32" r="6" class="g-gold"/></svg>
+        <p class="step-no">08 · Every boot after</p>
+        <h3>Skip steps 01–05 forever.</h3>
+        <p>A completed bootstrap is reused without contacting either snapshot publisher. From now on, startup is a node restart that catches up on whatever it missed, not a reinstall.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ INSIDE ============ -->
+<section class="inside" id="inside" aria-labelledby="inside-title">
+  <div class="wrap">
+    <div class="sec-head on-dark">
+      <p class="sec-no">§ 03</p>
+      <h2 id="inside-title" class="h2">Inside the box.</h2>
+      <p class="sec-intro">One process tree, two daemons, one volume, three ports, and a clear opinion about which of them the internet gets to see.</p>
+    </div>
+    <div class="inside-grid">
+      <figure class="blueprint">
+        <svg viewBox="0 0 1000 560" role="img" aria-labelledby="bp-t bp-d">
+          <title id="bp-t">Fig. 2: Blueprint of the Zovereign container</title>
+          <desc id="bp-d">Inside the container boundary, Tini handles PID 1 and a Python supervisor manages the Zakura node and lightwalletd. They are joined by private RPC on 127.0.0.1:8232. Both store data in the zovereign-data volume. Port 8233 connects Zakura to Zcash peers outside. Port 9067 connects lightwalletd to a wallet on the host's loopback, or to a remote wallet through a tunnel or TLS.</desc>
+          <defs>
+            <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" class="bp-grid"/></pattern>
+            <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="bp-arrow"/></marker>
+          </defs>
+          <rect width="1000" height="560" fill="url(#grid)"/>
+          <rect x="196" y="36" width="568" height="488" rx="14" class="bp-hull"/>
+          <text x="214" y="28" class="bp-cap">CONTAINER · LINUX/AMD64 · ghcr.io/zcashlabs/zovereign</text>
+
+          <g class="bp-part" data-part="sup">
+            <rect x="228" y="62" width="504" height="50" rx="8" class="bp-box"/>
+            <text x="252" y="93" class="bp-t">tini → stack.py supervisor</text>
+            <text x="708" y="93" class="bp-s" text-anchor="end">UID/GID 10001</text>
+            <path d="M350 112 V150 M610 112 V150" class="bp-dash"/>
+            <circle cx="228" cy="62" r="14" class="bp-num"/><text x="228" y="67" class="bp-numt">1</text>
+          </g>
+
+          <g class="bp-part" data-part="zakura">
+            <rect x="228" y="150" width="244" height="190" rx="8" class="bp-box"/>
+            <text x="250" y="182" class="bp-t">Zakura 1.8.7</text>
+            <text x="250" y="204" class="bp-s">mainnet · archive · DB 30</text>
+            <g class="bp-chain"><rect x="250" y="240" width="34" height="34" rx="3"/><rect x="298" y="240" width="34" height="34" rx="3"/><rect x="346" y="240" width="34" height="34" rx="3"/><rect x="394" y="240" width="34" height="34" rx="3" class="hot"/><path d="M284 257h14M332 257h14M380 257h14"/></g>
+            <text x="250" y="312" class="bp-s">restored + live blocks</text>
+            <circle cx="228" cy="150" r="14" class="bp-num"/><text x="228" y="155" class="bp-numt">2</text>
+          </g>
+
+          <g class="bp-part" data-part="rpc">
+            <path d="M472 245 H524" class="bp-pipe"/>
+            <path d="M472 245 H524" class="bp-pipe-flow"/>
+            <text x="498" y="226" class="bp-s" text-anchor="middle">:8232</text>
+            <circle cx="498" cy="245" r="14" class="bp-num"/><text x="498" y="250" class="bp-numt">3</text>
+          </g>
+
+          <g class="bp-part" data-part="lwd">
+            <rect x="524" y="150" width="208" height="190" rx="8" class="bp-box"/>
+            <text x="546" y="182" class="bp-t">lightwalletd v0.6.0</text>
+            <text x="546" y="204" class="bp-s">compact-block cache</text>
+            <g class="bp-cards"><rect x="546" y="226" width="44" height="28" rx="3"/><rect x="598" y="226" width="44" height="28" rx="3"/><rect x="650" y="226" width="44" height="28" rx="3"/><rect x="546" y="262" width="44" height="28" rx="3"/><rect x="598" y="262" width="44" height="28" rx="3"/><rect x="650" y="262" width="44" height="28" rx="3" class="hot"/></g>
+            <text x="546" y="320" class="bp-s">health: real GetBlock</text>
+            <circle cx="732" cy="150" r="14" class="bp-num"/><text x="732" y="155" class="bp-numt">4</text>
+          </g>
+
+          <g class="bp-part" data-part="vol">
+            <path d="M330 340 V392 M628 340 V392" class="bp-line"/>
+            <rect x="228" y="392" width="504" height="104" rx="8" class="bp-box vol"/>
+            <text x="252" y="424" class="bp-t">/data ← zovereign-data</text>
+            <text x="252" y="452" class="bp-s">zakura/ · lightwalletd/ · bootstrap/</text>
+            <text x="252" y="476" class="bp-s">locked to one stack · survives container replacement</text>
+            <circle cx="228" cy="392" r="14" class="bp-num"/><text x="228" y="397" class="bp-numt">5</text>
+          </g>
+
+          <g class="bp-part" data-part="p2p">
+            <path d="M228 245 H128" class="bp-line" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <rect x="186" y="231" width="20" height="28" rx="3" class="bp-port"/>
+            <g class="bp-peers"><circle cx="72" cy="200" r="9"/><circle cx="44" cy="256" r="9"/><circle cx="96" cy="300" r="9"/><circle cx="104" cy="245" r="11" class="hub"/><path d="M72 200L104 245L44 256M104 245L96 300"/></g>
+            <text x="24" y="340" class="bp-s">Zcash peers</text>
+            <text x="140" y="232" class="bp-t sm">:8233</text>
+            <circle cx="196" cy="290" r="14" class="bp-num"/><text x="196" y="295" class="bp-numt">6</text>
+          </g>
+
+          <g class="bp-part" data-part="grpc">
+            <path d="M774 210 H906" class="bp-line" marker-end="url(#arr)"/>
+            <path d="M732 210 H754" class="bp-line"/>
+            <rect x="754" y="196" width="20" height="28" rx="3" class="bp-port gold"/>
+            <text x="786" y="194" class="bp-t sm">127.0.0.1:9067</text>
+            <g class="bp-wallet"><rect x="914" y="166" width="52" height="86" rx="10"/><rect x="922" y="180" width="36" height="52" rx="3" class="scr"/><text x="940" y="274" text-anchor="middle" class="bp-s">your wallet</text></g>
+            <path d="M764 224 V392 H898" class="bp-dash wide" marker-end="url(#arr)"/>
+            <text x="782" y="380" class="bp-s">tunnel or TLS</text>
+            <g class="bp-wallet far"><rect x="908" y="370" width="64" height="44" rx="6"/><text x="940" y="436" text-anchor="middle" class="bp-s">remote client</text></g>
+            <circle cx="764" cy="286" r="14" class="bp-num"/><text x="764" y="291" class="bp-numt">7</text>
+          </g>
+        </svg>
+        <figcaption><span class="fig-no">Fig. 2</span> Blueprint. Hover or focus a part in the legend below to trace it.</figcaption>
+      </figure>
+
+      <ol class="legend" aria-label="Parts of the container">
+        <li data-part="sup"><span class="lg-n">1</span><div><h3>Supervisor</h3><p>Tini handles PID 1 while a Python supervisor downloads, verifies, restores, drops privileges, and runs both daemons as a pair: if either exits, its peer is stopped and Docker restarts the whole stack.</p></div></li>
+        <li data-part="zakura"><span class="lg-n">2</span><div><h3>Zakura archive node</h3><p>Full mainnet history in archive mode, restored from a snapshot instead of rebuilt from the network, then kept current from peers.</p></div></li>
+        <li data-part="rpc"><span class="lg-n">3</span><div><h3>Private RPC</h3><p>Node RPC listens on <code>127.0.0.1:8232</code> inside the container. It is never published to the host. No credentials to generate, rotate or leak.</p></div></li>
+        <li data-part="lwd"><span class="lg-n">4</span><div><h3>lightwalletd</h3><p>Starts with a populated compact-block cache and catches up from your node. The health probe makes it serve a real block before Docker calls the stack healthy.</p></div></li>
+        <li data-part="vol"><span class="lg-n">5</span><div><h3>One named volume</h3><p><code>zovereign-data</code> holds both databases and any unfinished downloads. It outlives the container, so updates mean replace the box, keep the data.</p></div></li>
+        <li data-part="p2p"><span class="lg-n">6</span><div><h3>Peer port 8233</h3><p>The one port meant for the internet: the node’s connection to other Zcash peers.</p></div></li>
+        <li data-part="grpc"><span class="lg-n">7</span><div><h3>Wallet port 9067</h3><p>lightwalletd gRPC, bound to your host’s loopback by default. Serving another machine is a deliberate choice: an SSH tunnel, a private network, or your own TLS certificate.</p></div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ WHY ============ -->
+<section class="why" aria-labelledby="why-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-no">§ 04</p>
+      <h2 id="why-title" class="h2">Why it’s worth the disk.</h2>
+    </div>
+    <div class="why-grid">
+      <article class="why-item">
+        <p class="why-n" aria-hidden="true">i.</p>
+        <h3>You skip the slowest part on purpose.</h3>
+        <p>An archive node’s history is the expensive bit. Zovereign downloads it as a verified snapshot instead of replaying it from the network, then lets your node do the live work. The win is not a magic number. It is not doing the historical rebuild at all.</p>
+      </article>
+      <article class="why-item">
+        <p class="why-n" aria-hidden="true">ii.</p>
+        <h3>The whole stack, not just a node.</h3>
+        <p>A node without lightwalletd can’t serve a light wallet. lightwalletd without a node needs someone else’s RPC. You get both, started in the right order, configured against each other, and watched as one unit.</p>
+      </article>
+      <article class="why-item">
+        <p class="why-n" aria-hidden="true">iii.</p>
+        <h3>Failure is a planned state.</h3>
+        <p>Downloads resume. Corrupt archives get rejected. Extraction errors clean up their own staging. An incompatible database is refused instead of silently replaced. Installed data is never overwritten by a bootstrap that doesn’t recognise it.</p>
+      </article>
+      <article class="why-item">
+        <p class="why-n" aria-hidden="true">iv.</p>
+        <h3>Private until you say otherwise.</h3>
+        <p>RPC stays inside the container. Wallet gRPC is on host loopback. Daemons run unprivileged. Opening it to the world is something you do on purpose, with a tunnel or TLS, not something you discover in your logs.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EVIDENCE ============ -->
+<section class="evidence" id="evidence" aria-labelledby="ev-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-no">§ 05</p>
+      <h2 id="ev-title" class="h2">Field test, written down.</h2>
+      <p class="sec-intro">We ran the full thing against real mainnet snapshots on a clean Linux amd64 VPS (12 CPU threads, 32 GiB RAM, 1 TB SSD). These are dated results from that run, not a live counter.</p>
+    </div>
+    <article class="report" aria-labelledby="rep-title">
+      <header class="report-head">
+        <div>
+          <p class="report-k">Acceptance report</p>
+          <h3 id="rep-title">Full mainnet restore — passed</h3>
+        </div>
+        <p class="stamp" aria-label="Dated 14 November 2026"><span>Verified</span><time datetime="2026-11-14">14 Nov 2026</time></p>
+      </header>
+      <dl class="report-grid">
+        <div><dt>Zakura archive downloaded &amp; verified</dt><dd><span class="num">275,461,001,203</span> bytes</dd></div>
+        <div><dt>lightwalletd archive downloaded &amp; verified</dt><dd><span class="num">24,580,470,326</span> bytes</dd></div>
+        <div><dt>Blocks loaded from the imported cache</dt><dd><span class="num">3,571,794</span></dd></div>
+        <div><dt>Bootstrap, lifecycle &amp; bundled-binary tests</dt><dd><span class="num">16 / 16</span> on the VPS and GitHub CI</dd></div>
+      </dl>
+      <div class="timeline">
+        <p class="tl-title">Our development run, empty volume → <code>healthy</code>: <strong>≈99 min</strong></p>
+        <div class="tl-bar" role="img" aria-label="About 86 of 99 minutes went to downloading, verifying and restoring. The remainder included our own interruptions and fixes. Zakura caught up in about 40 seconds after restore.">
+          <span class="tl-seg dl" style="--w:86.9%"><b>download · verify · restore ≈86 min</b></span>
+          <span class="tl-seg rest" style="--w:12.4%"></span>
+          <span class="tl-seg tip" style="--w:0.7%"></span>
+        </div>
+        <ul class="tl-key">
+          <li><i class="k dl"></i>≈86 min moving and checking ~300 GB, then restoring</li>
+          <li><i class="k rest"></i>the rest, including our own interruptions and fixes</li>
+          <li><i class="k tip"></i>≈40 s for Zakura to catch up after restore</li>
+        </ul>
+        <p class="fine">This was one run on a fast, well-connected host. It is not a benchmark and we haven’t measured a same-hardware from-scratch baseline. Your first install depends on bandwidth, disk and how far the chain has moved since the snapshot.</p>
+      </div>
+      <ul class="checks">
+        <li>Reached the live tip and served an actual compact block through gRPC.</li>
+        <li>Removed compressed archives and range files after restore.</li>
+        <li>Restarted, reused both databases with no new downloads, and came back <code>healthy</code>.</li>
+        <li>Served a client on another machine over a private Tailscale-bound port.</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- ============ REQUIREMENTS ============ -->
+<section class="reqs" aria-labelledby="req-title">
+  <div class="wrap reqs-grid">
+    <div>
+      <p class="sec-no">§ 06</p>
+      <h2 id="req-title" class="h2">Bring a real machine.</h2>
+      <p class="sec-intro">This is an archive node, not a toy. First boot moves about <strong>300 GB compressed</strong> (≈275 GB Zakura + ≈25 GB lightwalletd), then verifies and extracts it, so plan the disk accordingly.</p>
+      <p class="sec-intro">On a fast SSD host with good bandwidth, expect the first end-to-end install to take <strong>roughly 2–3 hours</strong>. Slower links and disks take longer. Later starts reuse the data.</p>
+    </div>
+    <div class="plate" role="group" aria-label="Recommended hardware">
+      <div class="plate-head"><span>Recommended</span><span class="rivets" aria-hidden="true"><i></i><i></i></span></div>
+      <dl class="plate-grid">
+        <div><dt>CPU</dt><dd>4 cores</dd></div>
+        <div><dt>Memory</dt><dd>16 GiB</dd></div>
+        <div><dt>Storage</dt><dd>SSD</dd></div>
+        <div><dt>Data capacity</dt><dd>1 TB</dd></div>
+      </dl>
+      <ul class="compat">
+        <li class="ok"><b>Linux amd64</b> — tested platform.</li>
+        <li class="ok"><b>Docker Desktop / WSL 2</b> — allocate these resources to Docker’s VM, not just the host.</li>
+        <li class="no"><b>Native ARM64</b> — not supported.</li>
+        <li class="warn"><b>Apple Silicon</b> — runs under amd64 emulation; a full mainnet restore has not passed validation there.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INSTALL ============ -->
+<section class="install" id="install" aria-labelledby="install-title">
+  <div class="wrap">
+    <div class="sec-head on-dark">
+      <p class="sec-no">§ 07</p>
+      <h2 id="install-title" class="h2">Start it.</h2>
+      <p class="sec-intro">No registry login, separate RPC provider, Docker-in-Docker or RPC credentials. Pick one way to run it. Both create the same <code>zovereign</code> container and <code>zovereign-data</code> volume.</p>
+    </div>
+
+    <div class="tabs" data-tabs>
+      <div class="tablist" role="tablist" aria-label="Install method" hidden>
+        <button role="tab" id="tab-run" aria-controls="panel-run" aria-selected="true">Published image</button>
+        <button role="tab" id="tab-compose" aria-controls="panel-compose" aria-selected="false">Build with Compose</button>
+      </div>
+
+      <div class="panel" id="panel-run" role="tabpanel" aria-labelledby="tab-run">
+        <h3 class="panel-h">Published image <span>· nothing to clone</span></h3>
+        <div class="code">
+          <div class="code-bar"><span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="code-name">shell</span><button class="copy" type="button" data-copy="cmd-run" hidden><span class="copy-label">Copy</span></button></div>
+<pre id="cmd-run"><code>docker run -d --platform linux/amd64 \
+  --name zovereign --restart unless-stopped --stop-timeout 120 \
+  --log-driver json-file --log-opt max-size=20m --log-opt max-file=3 \
+  --mount type=volume,src=zovereign-data,dst=/data \
+  -p 8233:8233 -p 127.0.0.1:9067:9067 \
+  ghcr.io/zcashlabs/zovereign:latest</code></pre>
+        </div>
+        <ul class="flag-notes">
+          <li><code>--mount …zovereign-data</code> keeps databases and download progress across container replacement.</li>
+          <li><code>127.0.0.1:9067</code> publishes wallet gRPC to your machine only.</li>
+          <li><code>--stop-timeout 120</code> gives both databases time to flush on stop.</li>
+        </ul>
+      </div>
+
+      <div class="panel" id="panel-compose" role="tabpanel" aria-labelledby="tab-compose">
+        <h3 class="panel-h">From source <span>· build locally with Compose</span></h3>
+        <div class="code">
+          <div class="code-bar"><span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="code-name">shell</span><button class="copy" type="button" data-copy="cmd-compose" hidden><span class="copy-label">Copy</span></button></div>
+<pre id="cmd-compose"><code>git clone https://github.com/zcashlabs/zovereign.git
+cd zovereign
+docker compose up -d --build</code></pre>
+        </div>
+        <ul class="flag-notes">
+          <li>Same defaults: bounded logs, two-minute shutdown grace, loopback gRPC, persistent volume.</li>
+          <li>Optional: copy <code>.env.example</code> to <code>.env</code> to change ports, download concurrency or disk reserve.</li>
+          <li>Pause with <code>docker compose stop</code>; resume with <code>docker compose start</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="after">
+      <div class="after-step">
+        <p class="step-no">Then · watch it work</p>
+        <div class="code sm">
+          <div class="code-bar"><span class="code-name">logs</span><button class="copy" type="button" data-copy="cmd-logs" hidden><span class="copy-label">Copy</span></button></div>
+<pre id="cmd-logs"><code>docker logs -f --tail=100 zovereign</code></pre>
+        </div>
+      </div>
+      <div class="after-step">
+        <p class="step-no">Then · ask if it’s ready</p>
+        <div class="code sm">
+          <div class="code-bar"><span class="code-name">health</span><button class="copy" type="button" data-copy="cmd-health" hidden><span class="copy-label">Copy</span></button></div>
+<pre id="cmd-health"><code>docker inspect --format '{{.State.Health.Status}}' zovereign</code></pre>
+        </div>
+        <p class="after-note"><code>starting</code> during bootstrap. <code>healthy</code> once the node is near tip and a real compact block came back.</p>
+      </div>
+      <div class="after-step">
+        <p class="step-no">Then · point a wallet at it</p>
+        <p class="endpoint"><code>127.0.0.1:9067</code></p>
+        <p class="after-note">Any wallet or gRPC client that supports a custom plaintext server. For other machines, use a trusted tunnel or <a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#serving-remote-clients-with-tls">configure TLS</a>.</p>
+      </div>
+    </div>
+    <p class="keep"><strong>Keep the volume.</strong> Stop gracefully with <code>docker stop -t 120 zovereign</code>. Removing or replacing the container keeps <code>zovereign-data</code>; deleting the volume means downloading ~300 GB again.</p>
+    <p class="docs-cta"><a class="btn btn-gold" href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md">Read the deployment guide <span aria-hidden="true">→</span></a> <span>Updating, storage, recovery, configuration and TLS.</span></p>
+  </div>
+</section>
+
+<!-- ============ TRUST ============ -->
+<section class="trust" id="trust" aria-labelledby="trust-title">
+  <div class="wrap trust-grid">
+    <div>
+      <p class="sec-no">§ 08</p>
+      <h2 id="trust-title" class="h2">The fine print, in large print.</h2>
+      <p class="sec-intro">Snapshots are a shortcut, and shortcuts have a shape. Here it is, so nobody has to find it in a footnote.</p>
+    </div>
+    <div class="trust-cols">
+      <div class="trust-col yes">
+        <h3>What a SHA-256 check buys you</h3>
+        <ul>
+          <li>Proof the archive you got is the archive the manifest described, byte for byte.</li>
+          <li>Protection against truncated, corrupted or tampered-in-transit downloads.</li>
+          <li>Your own node and wallet server afterwards: no remote RPC backend in your wallet’s path.</li>
+        </ul>
+      </div>
+      <div class="trust-col no">
+        <h3>What it doesn’t</h3>
+        <ul>
+          <li>Authentication. A publisher who can replace both the archive and its manifest can replace the checksum too.</li>
+          <li>From-genesis verification. Imported history is trusted to the snapshot publishers.</li>
+          <li>So: self-hosted, yes. “Trustless”, no. We’d rather you know.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="faq" id="faq" aria-labelledby="faq-title">
+  <div class="wrap faq-grid">
+    <div>
+      <p class="sec-no">§ 09</p>
+      <h2 id="faq-title" class="h2">Questions people actually ask.</h2>
+    </div>
+    <div class="faq-list">
+      <details>
+        <summary>How long does the first start take?</summary>
+        <p>Hours, not minutes. It has to download roughly 300 GB, hash all of it, extract it, then let Zakura catch up past the snapshot. On a fast SSD host with good bandwidth we estimate 2–3 hours end to end; our own development run took about 99 minutes including interruptions. Slower disks or links take longer, and we don’t promise a fixed time.</p>
+      </details>
+      <details>
+        <summary>And every start after that?</summary>
+        <p>Much shorter. A completed bootstrap is reused without contacting the snapshot publishers, so a restart is just the two daemons starting on existing databases and catching up on whatever happened while they were stopped.</p>
+      </details>
+      <details>
+        <summary>What if my download gets interrupted?</summary>
+        <p>Start the container again. Completed ranges persist in a <code>.part</code> file and the chosen snapshot is pinned, so it resumes the same archive rather than starting over, even if a newer snapshot has been published in the meantime.</p>
+      </details>
+      <details>
+        <summary>Do I need a separate full node, RPC provider or credentials?</summary>
+        <p>No. Zakura is bundled, its RPC listens on loopback inside the container, and lightwalletd connects to it there. There is no Docker socket, no registry login and no credentials file to manage.</p>
+      </details>
+      <details>
+        <summary>Can my phone wallet use it from elsewhere?</summary>
+        <p>Not by default, deliberately. gRPC binds to your host’s loopback. To serve another machine, use an SSH tunnel or a private network, or mount a certificate and key and set <code>TLS_CERT</code> / <code>TLS_KEY</code>. The <a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#serving-remote-clients-with-tls">deployment guide</a> shows the exact command.</p>
+      </details>
+      <details>
+        <summary>What happens if one of the daemons crashes?</summary>
+        <p>They live and die as a pair. If either exits, the supervisor stops its peer gracefully and exits, and Docker’s restart policy brings the whole stack back on the same volume.</p>
+      </details>
+      <details>
+        <summary>Will it run on my M-series Mac?</summary>
+        <p>It runs under amd64 emulation, but a full mainnet restore under emulation has not passed validation, and native ARM64 isn’t supported. Linux amd64 is the tested platform. On any Docker Desktop, allocate the CPU, memory and disk to Docker’s VM.</p>
+      </details>
+      <details>
+        <summary>How do I update without losing anything?</summary>
+        <p>Pull the new image, stop with a 120-second grace period, remove the container, and run the same command again with the same <code>zovereign-data</code> volume. The databases stay put. Check release notes first: an incompatible database is refused, not silently replaced. Pin a <code>sha-&lt;commit&gt;</code> tag or digest when you want controlled upgrades.</p>
+      </details>
+      <details>
+        <summary>Is this trustless?</summary>
+        <p>No. Checksums protect integrity, not authenticity, and imported history depends on the snapshot publishers. What you do get is your own node and wallet server, with no third-party RPC in the path from here on. See <a href="#trust">the fine print</a>.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CLOSER ============ -->
+<section class="closer" aria-labelledby="closer-title">
+  <div class="wrap closer-inner">
+    <svg class="closer-art" viewBox="0 0 200 200" aria-hidden="true">
+      <polygon class="ca-t" points="100,22 172,62 100,102 28,62"/>
+      <polygon class="ca-l" points="28,62 100,102 100,182 28,142"/>
+      <polygon class="ca-r" points="172,62 100,102 100,182 172,142"/>
+      <path class="ca-band" d="M28 96 L100 136 L172 96"/>
+      <path class="ca-band g" d="M28 118 L100 158 L172 118"/>
+      <circle class="ca-port" cx="148" cy="106" r="6"/>
+    </svg>
+    <h2 id="closer-title" class="display sm">Own the endpoint your wallet talks to.</h2>
+    <p class="lede">One image. One volume. One command. The rest is your node’s business.</p>
+    <div class="hero-actions center">
+      <a class="btn btn-gold" href="#install">Get the command <span aria-hidden="true">→</span></a>
+      <a class="btn btn-ghost on-dark" href="https://github.com/zcashlabs/zovereign">Read the source</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-grid">
+    <div class="foot-brand">
+      <p class="brand-word">Zovereign</p>
+      <p>Self-hosted Zcash infrastructure in one Docker image: Zakura 1.8.7 archive node and lightwalletd v0.6.0, restored from published mainnet snapshots.</p>
+    </div>
+    <nav aria-label="Project">
+      <h2 class="foot-h">Project</h2>
+      <ul>
+        <li><a href="https://github.com/zcashlabs/zovereign">Source on GitHub</a></li>
+        <li><a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md">Deployment guide</a></li>
+        <li><a href="https://github.com/zcashlabs/zovereign/blob/main/CONTRIBUTING.md">Contributing &amp; tests</a></li>
+        <li><a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#trust-and-validation-boundary">Trust boundary</a></li>
+      </ul>
+    </nav>
+    <div>
+      <h2 class="foot-h">Image</h2>
+      <p class="foot-mono">ghcr.io/zcashlabs/zovereign:latest</p>
+      <p class="foot-small">Pin <code>sha-&lt;full-commit&gt;</code> or a digest for a specific tested build.</p>
+    </div>
+  </div>
+  <div class="wrap foot-base">
+    <p>Zakura and lightwalletd are upstream projects, bundled at pinned versions. Snapshot history is trusted to its publishers.</p>
+    <a href="#top" class="to-top">Back to top ↑</a>
+  </div>
+</footer>
+
+<div class="toast" role="status" aria-live="polite"></div>
+<script src="site.js" defer></script>
+</body>
+</html>

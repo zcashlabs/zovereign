@@ -16,6 +16,10 @@ CONTRIBUTING.md, and docs/single-container.md first.
 - `compose.yaml` and `.env.example`: local user startup defaults.
 - `tests/test_stack.py`: fixture and real-binary regressions; no mainnet download.
 - `tests/accept_mainnet.py`: opt-in acceptance for an existing real deployment.
+- `website/dist/`: buildless landing page, styles, JavaScript, and illustrations.
+  Keep installation commands aligned with README.md, benchmark claims dated,
+  and the snapshot trust boundary clear. Check JavaScript with
+  `node --check website/dist/site.js`; serve it using website/README.md.
 - `scripts/` and `deploy/digitalocean/`: separate snapshot publisher tooling.
   Do not change that infrastructure incidentally while editing the combined image.
 
