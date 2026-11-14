@@ -55,6 +55,8 @@ def publisher():
             if value is None:
                 self.send_error(404)
                 return
+            if hook := state.get("before_response"):
+                hook(self.headers.get("Range"))
             total = len(value)
             offset, end = 0, total - 1
             byte_range = self.headers.get("Range")
@@ -70,7 +72,7 @@ def publisher():
                 self.send_header("Content-Range", f"bytes {returned_offset}-{end}/{total}")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            if byte_range and state["truncate_once"]:
+            if byte_range and state["truncate_once"] and offset == state.get("truncate_offset", offset):
                 state["truncate_once"] = False
                 body = body[:len(body) // 2]
                 self.close_connection = True
@@ -171,6 +173,157 @@ class BootstrapTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), server["files"]["/node.tar.zst"])
             self.assertEqual(list(source.parent.glob(source.name + ".range-*")), [])
             self.assertEqual(len(stack.CHILDREN), 0)
+
+    def test_slow_first_range_refills_slots_with_bounded_prefetch(self):
+        with publisher() as server:
+            data = bytes(range(256)) * 64
+            server["files"]["/data"] = data
+            first_started, refilled, release = (threading.Event() for _ in range(3))
+
+            def gate(byte_range):
+                start = int(byte_range.split("=")[1].split("-")[0])
+                if start == 0:
+                    first_started.set()
+                    release.wait(10)
+                elif start >= 3 * 1024:
+                    refilled.set()
+
+            server["before_response"] = gate
+            item = {"url": server["url"] + "/data", "size": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest()}
+            source = self.root / "bootstrap/data.part"
+            errors = []
+
+            def run():
+                try:
+                    stack.download(item, source, 1024, 0, workers=3)
+                except BaseException as error:
+                    errors.append(error)
+
+            worker = threading.Thread(target=run)
+            worker.start()
+            try:
+                self.assertTrue(first_started.wait(3))
+                # Old scheduling cannot start range four until the gate opens.
+                self.assertTrue(refilled.wait(3), "idle slot was not refilled")
+                time.sleep(0.2)
+                requests = [r for path, r in server["requests"] if path == "/data"]
+                self.assertLessEqual(len(requests), 6, "prefetch exceeded two worker windows")
+                self.assertEqual(source.stat().st_size, 0, "committed a noncontiguous prefix")
+            finally:
+                release.set()
+                worker.join(10)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(errors, [])
+            self.assertEqual(source.read_bytes(), data)
+            self.assertEqual(list(source.parent.glob(source.name + ".range-*")), [])
+            self.assertEqual(len(stack.CHILDREN), 0)
+
+    def test_later_range_retries_while_first_is_blocked(self):
+        with publisher() as server:
+            data = bytes(range(256)) * 32
+            server["files"]["/data"] = data
+            server["truncate_once"] = True
+            server["truncate_offset"] = 1024
+            release, refilled = threading.Event(), threading.Event()
+            retries = []
+
+            def gate(byte_range):
+                start = int(byte_range.split("=")[1].split("-")[0])
+                if start == 0:
+                    release.wait(8)
+                elif start == 1024:
+                    retries.append(start)
+                    if len(retries) == 2:
+                        release.set()
+                elif start >= 3 * 1024:
+                    refilled.set()
+
+            server["before_response"] = gate
+            item = {"url": server["url"] + "/data", "size": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest()}
+            source = self.root / "bootstrap/retry.part"
+            try:
+                stack.download(item, source, 1024, 0, workers=3)
+            finally:
+                release.set()
+            self.assertEqual(len(retries), 2)
+            self.assertTrue(refilled.is_set())
+            self.assertEqual(source.read_bytes(), data)
+            self.assertEqual(len(stack.CHILDREN), 0)
+            self.assertEqual(list(source.parent.glob(source.name + ".range-*")), [])
+
+    def test_waiter_start_failure_cleans_spawned_download(self):
+        with publisher() as server:
+            data = bytes(range(256)) * 32
+            server["files"]["/data"] = data
+            item = {"url": server["url"] + "/data", "size": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest()}
+            source = self.root / "bootstrap/thread-failure.part"
+            source.write_bytes(data[:1500])
+            original_start = threading.Thread.start
+
+            def fail_waiter(thread):
+                if thread._target.__name__ == "notify_exit":
+                    raise RuntimeError("injected waiter failure")
+                return original_start(thread)
+
+            with patch.object(stack.threading.Thread, "start", fail_waiter):
+                with self.assertRaisesRegex(RuntimeError, "injected waiter failure"):
+                    stack.download(item, source, 1024, 0, workers=3)
+            self.assertEqual(source.read_bytes(), data[:1500])
+            self.assertEqual(len(stack.CHILDREN), 0)
+            self.assertEqual(list(source.parent.glob(source.name + ".range-*")), [])
+
+    def test_parallel_shutdown_preserves_prefix_and_cleans_children(self):
+        with publisher() as server:
+            data = bytes(range(256)) * 32
+            server["files"]["/data"] = data
+            release = threading.Event()
+            server["before_response"] = lambda _range: release.wait(5)
+            item = {"url": server["url"] + "/data", "size": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest()}
+            source = self.root / "bootstrap/cancel.part"
+            source.write_bytes(data[:1500])
+            original_spawn = stack.spawn
+            interrupted = False
+
+            def interrupt_once(*args, **kwargs):
+                process = original_spawn(*args, **kwargs)
+                original_poll = process.poll
+
+                def poll():
+                    nonlocal interrupted
+                    if not interrupted:
+                        interrupted = True
+                        raise stack.Shutdown()
+                    return original_poll()
+
+                process.poll = poll
+                return process
+
+            try:
+                with patch.object(stack, "spawn", side_effect=interrupt_once):
+                    with self.assertRaises(stack.Shutdown):
+                        stack.download(item, source, 1024, 0, workers=3)
+            finally:
+                release.set()
+            self.assertEqual(source.read_bytes(), data[:1500])
+            self.assertEqual(len(stack.CHILDREN), 0)
+            self.assertEqual(list(source.parent.glob(source.name + ".range-*")), [])
+
+    def test_parallel_resume_keeps_existing_prefix(self):
+        with publisher() as server:
+            fixtures(server)
+            item = stack.choose_snapshot("zakura", server["url"] + "/node.json")
+            data = server["files"]["/node.tar.zst"]
+            source = self.root / "bootstrap/resume.part"
+            source.write_bytes(data[:1500])
+            stack.download(item, source, 1024, 0, workers=3)
+            self.assertEqual(source.read_bytes(), data)
+            starts = [int(r.split("=")[1].split("-")[0])
+                      for path, r in server["requests"] if path == "/node.tar.zst"]
+            self.assertEqual(min(starts), 1500)
 
     def test_incorrect_ranges_never_append_to_cached_archive(self):
         with publisher() as server, patch.object(stack.time, "sleep"):
