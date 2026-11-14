@@ -104,7 +104,6 @@
 <section class="install" id="install" aria-labelledby="install-title">
   <div class="wrap">
     <div class="sec-head on-dark">
-      <p class="sec-no">§ 01</p>
       <h2 id="install-title" class="h2">Start it.</h2>
       <p class="sec-intro">No registry login, separate RPC provider, Docker-in-Docker or RPC credentials. Pick one way to run it. Both create the same <code>zovereign</code> container and <code>zovereign-data</code> volume.</p>
     </div>
@@ -180,7 +179,6 @@ docker compose up -d --build</code></pre>
 <section class="ledger-sec" aria-labelledby="ledger-title">
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-no">§ 02</p>
       <h2 id="ledger-title" class="h2">Things you can stop doing.</h2>
       <p class="sec-intro">Running Zcash wallet infrastructure used to mean a weekend of glue. Zovereign does the glue, and does it the same way every time.</p>
     </div>
@@ -198,7 +196,6 @@ docker compose up -d --build</code></pre>
 <section class="how" id="how" aria-labelledby="how-title">
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-no">§ 03</p>
       <h2 id="how-title" class="h2">From two crates of history to a block in your wallet.</h2>
       <p class="sec-intro">On first boot, Zovereign turns about 300 GB of compressed snapshots into a running node and wallet server. Every step is checked, resumable and boring in the best way. Here is the actual sequence.</p>
     </div>
@@ -276,7 +273,6 @@ docker compose up -d --build</code></pre>
 <section class="inside" id="inside" aria-labelledby="inside-title">
   <div class="wrap">
     <div class="sec-head on-dark">
-      <p class="sec-no">§ 04</p>
       <h2 id="inside-title" class="h2">Inside the box.</h2>
       <p class="sec-intro">One process tree, two daemons, one volume, three ports, and a clear opinion about which of them the internet gets to see.</p>
     </div>
@@ -376,7 +372,6 @@ docker compose up -d --build</code></pre>
 <section class="why" aria-labelledby="why-title">
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-no">§ 05</p>
       <h2 id="why-title" class="h2">Why it’s worth the disk.</h2>
     </div>
     <div class="why-grid">
@@ -408,7 +403,6 @@ docker compose up -d --build</code></pre>
 <section class="evidence" id="evidence" aria-labelledby="ev-title">
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-no">§ 06</p>
       <h2 id="ev-title" class="h2">Field test, written down.</h2>
       <p class="sec-intro">We ran the full thing against real mainnet snapshots on a clean Linux amd64 VPS (12 CPU threads, 32 GiB RAM, 1 TB SSD). These are dated results from that run, not a live counter.</p>
     </div>
@@ -454,7 +448,6 @@ docker compose up -d --build</code></pre>
 <section class="reqs" aria-labelledby="req-title">
   <div class="wrap reqs-grid">
     <div>
-      <p class="sec-no">§ 07</p>
       <h2 id="req-title" class="h2">Bring a real machine.</h2>
       <p class="sec-intro">This is an archive node, not a toy. First boot moves about <strong>300 GB compressed</strong> (≈275 GB Zakura + ≈25 GB lightwalletd), then verifies and extracts it, so plan the disk accordingly.</p>
       <p class="sec-intro">On a fast SSD host with good bandwidth, expect the first end-to-end install to take <strong>roughly 2–3 hours</strong>. Slower links and disks take longer. Later starts reuse the data.</p>
@@ -481,7 +474,6 @@ docker compose up -d --build</code></pre>
 <section class="trust" id="trust" aria-labelledby="trust-title">
   <div class="wrap trust-grid">
     <div>
-      <p class="sec-no">§ 08</p>
       <h2 id="trust-title" class="h2">The fine print, in large print.</h2>
       <p class="sec-intro">Snapshots are a shortcut, and shortcuts have a shape. Here it is, so nobody has to find it in a footnote.</p>
     </div>
@@ -510,7 +502,6 @@ docker compose up -d --build</code></pre>
 <section class="faq" id="faq" aria-labelledby="faq-title">
   <div class="wrap faq-grid">
     <div>
-      <p class="sec-no">§ 09</p>
       <h2 id="faq-title" class="h2">Questions people actually ask.</h2>
     </div>
     <div class="faq-list">

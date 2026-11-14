@@ -72,17 +72,15 @@ strong { font-weight: 650; }
   line-height: 1.02; letter-spacing: -.02em; margin: 0 0 .4em; max-width: 18ch; text-wrap: balance;
 }
 .lede { font-size: clamp(1.06rem, 1.5vw, 1.25rem); line-height: 1.55; max-width: 38em; color: var(--ink-2); margin: 0 0 1.6em; }
-.kicker, .sec-no, .step-no, .report-k {
+.kicker, .step-no, .report-k {
   font: 600 .74rem/1.3 var(--f-mono); letter-spacing: .14em; text-transform: uppercase;
 }
 .kicker { display: inline-flex; align-items: center; gap: .6em; margin: 0 0 1.6em; color: var(--green); }
 .kicker .dot { width: .6em; height: .6em; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 3px rgba(244,183,40,.25); }
-.sec-no { color: var(--gold-text); margin: 0 0 1.1em; }
 .sec-head { margin-bottom: clamp(36px, 5vw, 64px); display: grid; gap: 0 48px; grid-template-columns: 1fr; }
 .sec-intro { font-size: 1.08rem; color: var(--muted); max-width: 36em; margin: 0 0 1em; }
 @media (min-width: 960px) {
   .sec-head { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: end; }
-  .sec-head .sec-no { grid-column: 1 / -1; }
   .sec-head .sec-intro { margin-bottom: .6em; }
 }
 
@@ -232,7 +230,6 @@ strong { font-weight: 650; }
 
 /* ---------- inside (dark) ---------- */
 .inside { padding: var(--sec-y) 0; background: var(--green-3); color: var(--paper); position: relative; }
-.on-dark .sec-no { color: var(--gold); }
 .on-dark .sec-intro { color: var(--ivory-dim); }
 .inside .h2 { color: var(--paper); }
 .inside-grid { display: grid; grid-template-columns: 1fr; gap: 40px; }
