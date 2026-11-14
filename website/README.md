@@ -7,12 +7,12 @@ in `dist/`:
 | --- | --- |
 | `dist/index.html` | The page, with its illustrations drawn as inline SVG. |
 | `dist/styles.css` | All styles, including responsive layout and reduced-motion rules. |
-| `dist/site.js` | Optional enhancements: copy buttons, install tabs, blueprint tracing, mobile-menu closing and scroll reveals. |
+| `dist/site.js` | Optional enhancements: copy buttons, install tabs, blueprint tracing and scroll reveals. |
 | `dist/favicon.svg` | Site icon. |
 
 There is no build step, package manifest or framework. The page works without
-JavaScript: both install methods show in full, the FAQ uses native
-`<details>`, and the mobile menu is a `<details>` disclosure. Fonts come from
+JavaScript: both install methods show in full and the FAQ uses native
+`<details>`. Fonts come from
 Google Fonts (Fraunces, Instrument Sans, JetBrains Mono), with system serif,
 sans-serif and monospace fallbacks if they fail to load.
 

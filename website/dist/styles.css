@@ -120,29 +120,7 @@ strong { font-weight: 650; }
 .brand-mark polygon { stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
 .bm-s { stroke: var(--gold); stroke-width: 1.6; }
 .brand-word { font: 700 1.38rem/1 var(--f-display); letter-spacing: -.01em; margin: 0; }
-.nav-desktop ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
-.nav-desktop a { display: block; padding: 8px 12px; border-radius: 8px; font-weight: 550; font-size: .95rem; text-decoration: none; color: var(--ink-2); }
-.nav-desktop a:hover { background: rgba(23,21,15,.06); color: var(--ink); }
-.masthead-cta { display: flex; gap: 10px; }
-.nav-mobile { display: none; position: relative; }
-.nav-mobile summary { list-style: none; cursor: pointer; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; border: 1.5px solid var(--ink); }
-.nav-mobile summary::-webkit-details-marker { display: none; }
-.burger { display: grid; gap: 6px; width: 18px; }
-.burger i { display: block; height: 2px; background: var(--ink); border-radius: 2px; transition: transform .2s ease; }
-.nav-mobile[open] .burger i:first-child { transform: translateY(4px) rotate(45deg); }
-.nav-mobile[open] .burger i:last-child { transform: translateY(-4px) rotate(-45deg); }
-.nav-mobile nav { position: absolute; right: 0; top: calc(100% + 10px); width: min(290px, calc(100vw - 32px)); background: var(--paper); border: 1.5px solid var(--ink); border-radius: var(--radius); box-shadow: 6px 6px 0 var(--ink); padding: 8px; }
-.nav-mobile ul { list-style: none; margin: 0; padding: 0; }
-.nav-mobile a { display: block; padding: 12px 14px; border-radius: 8px; text-decoration: none; font-weight: 550; }
-.nav-mobile a:hover, .nav-mobile a:focus-visible { background: var(--paper-2); }
-@media (max-width: 900px) {
-  .nav-desktop { display: none; }
-  .nav-mobile { display: block; }
-}
-@media (max-width: 520px) {
-  .masthead-cta .gh { display: none; }
-  .masthead-row { gap: 12px; }
-}
+@media (max-width: 520px) { .masthead-row { gap: 12px; } }
 
 /* ---------- hero ---------- */
 .hero { padding: clamp(40px, 7vw, 96px) 0 clamp(56px, 8vw, 112px); position: relative; }

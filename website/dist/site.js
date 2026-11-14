@@ -20,24 +20,6 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  /* ---- mobile menu: close on link, Escape, or outside click ---- */
-  var menu = document.querySelector('.nav-mobile');
-  if (menu) {
-    var summary = menu.querySelector('summary');
-    menu.addEventListener('toggle', function () {
-      summary.setAttribute('aria-label', menu.open ? 'Close menu' : 'Open menu');
-    });
-    menu.addEventListener('click', function (e) {
-      if (e.target.closest('a')) menu.open = false;
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && menu.open) { menu.open = false; summary.focus(); }
-    });
-    document.addEventListener('click', function (e) {
-      if (menu.open && !menu.contains(e.target)) menu.open = false;
-    });
-  }
-
   /* ---- copy to clipboard ---- */
   function fallbackCopy(text) {
     var ta = document.createElement('textarea');
