@@ -53,10 +53,11 @@ to `ghcr.io/zcashlabs/zovereign` as `latest` and `sha-<full-commit>` using the
 workflow's `GITHUB_TOKEN`. Forks publish under their own repository namespace.
 No registry password is required in repository secrets.
 
-GitHub creates new container packages as private. A package administrator must
-set the package's visibility to **Public** in its GitHub package settings once
-before anonymous pulls work. Confirm an unauthenticated pull on a clean Docker
-host before advertising a prebuilt image. The source quick start works
+The project's image has been verified with an unauthenticated pull. For new
+packages or forks, check visibility: if GitHub creates a private package, an
+administrator must set it to **Public** in GitHub package settings before
+anonymous pulls work. Confirm an unauthenticated pull on a clean Docker host
+before advertising a prebuilt image. The source quick start works
 independently of registry visibility. See
 [GitHub's registry guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 

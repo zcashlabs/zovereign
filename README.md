@@ -28,10 +28,27 @@ resources to Docker's VM. On Windows, use Linux containers and run the commands
 in WSL 2. Apple Silicon uses amd64 emulation; native arm64 is not currently
 supported, and a full mainnet restore under emulation has not been validated.
 
+## Run the published image directly
+
+Without cloning the repository or building an image, run:
+
+```bash
+docker run -d --platform linux/amd64 \
+  --name zovereign --restart unless-stopped --stop-timeout 120 \
+  --log-driver json-file --log-opt max-size=20m --log-opt max-file=3 \
+  --mount type=volume,src=zovereign-data,dst=/data \
+  -p 8233:8233 -p 127.0.0.1:9067:9067 \
+  ghcr.io/zcashlabs/zovereign:latest
+```
+
+The image is publicly pullable without a registry login. Choose this command
+or Compose for a deployment; both use the same container and volume names.
+Use a `sha-<full-commit>` image tag or digest to pin a specific tested build.
+
 ## Check readiness and connect
 
 ```bash
-docker compose logs -f --tail=100
+docker logs -f --tail=100 zovereign
 docker inspect --format '{{.State.Health.Status}}' zovereign
 ```
 
@@ -53,6 +70,8 @@ docker exec zovereign grpcurl -plaintext 127.0.0.1:9067 \
 
 ## Stop, resume, and update
 
+For a Compose deployment:
+
 ```bash
 docker compose stop          # Gracefully stop both services; keep data.
 docker compose start         # Resume using the same databases.
@@ -70,6 +89,10 @@ The persistent volume is named `zovereign-data`. Keep it across updates.
 deletes the databases and download progress**. Check release notes before
 updating database versions; an incompatible database is refused rather than
 silently replaced.
+
+With the direct image command, stop and resume using `docker stop -t 120
+zovereign` and `docker start zovereign`. For image updates, follow
+[the guide](docs/single-container.md#updating-a-published-image).
 
 ## Configure and learn more
 

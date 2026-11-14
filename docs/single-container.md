@@ -50,6 +50,23 @@ gRPC on the host's loopback interface. For another machine, use an SSH tunnel,
 or configure TLS as shown below. RPC port `8232` and the lightwalletd HTTP
 listener stay on the container's loopback interface.
 
+## Updating a published image
+
+The [README](../README.md#run-the-published-image-directly) also provides a
+prebuilt image command. To replace that container while keeping the databases:
+
+```bash
+docker pull --platform linux/amd64 ghcr.io/zcashlabs/zovereign:latest
+docker stop -t 120 zovereign
+docker rm zovereign
+```
+
+Run the README's published-image command again with the same `zovereign-data`
+volume. Read the version's compatibility notes before upgrading; use an
+immutable commit tag or digest when you need a controlled deployment. Removing
+the container does not remove this named volume. If you customized bindings,
+TLS mounts, or environment variables, preserve those options when recreating it.
+
 ## Capacity and first startup
 
 Use a Linux amd64 host with SSD storage. Start with 4 CPU cores, 16 GiB RAM,

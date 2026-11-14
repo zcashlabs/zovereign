@@ -72,5 +72,5 @@ jobs:
           docker push "$image:sha-$GITHUB_SHA"
           docker tag zovereign:test "$image:latest"
           docker push "$image:latest"
-          printf 'Tested Linux amd64 image: `%s:sha-%s`\n\nFirst publication requires a package administrator to enable Public visibility for anonymous pulls.\n' \
+          printf 'Tested Linux amd64 image: `%s:sha-%s`\n\nFor new packages, verify Public visibility before advertising anonymous pulls.\n' \
             "$image" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
