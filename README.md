@@ -1,173 +1,97 @@
-# lightwalletd snapshots
+# Zovereign
 
-A two-command prototype for creating a snapshot from a synced Docker-based `lightwalletd` and starting another `lightwalletd` from that snapshot.
+Run your own Zcash mainnet infrastructure in **one Docker container**: an
+archive Zakura node and lightwalletd, both bootstrapped from published snapshots.
+lightwalletd connects to the RPC on your bundled Zakura node.
 
-The current scripts are fixed to Zcash mainnet and default to
-`electriccoinco/lightwalletd:v0.5.4`.
+## Quick start
 
-For the complete data flow, consistency model, Docker restore mechanics, validation evidence, failure behavior, and security limitations, see [How lightwalletd snapshots work](docs/how-snapshots-work.md).
-
-## Requirements
-
-- Bash
-- Docker
-- Zstandard (`zstd`)
-- `sha256sum`
-- `curl` on the restore host when using an HTTP URL
-- A synchronized Zakura/Zcash node reachable from the restored container
-
-## 1. Create a snapshot
-
-Run this on the host containing the synced `lightwalletd` container:
+Install Docker with the Compose plugin, then run:
 
 ```bash
-sudo ./scripts/create-snapshot.sh ./snapshots
+git clone https://github.com/zcashlabs/zovereign.git
+cd zovereign
+docker compose up -d --build
 ```
 
-The default source container is `lightwalletd`, and the default database path is `/var/lib/lightwalletd`. Override them when necessary:
+No account, RPC credentials, or separate node is needed. The first start
+downloads and verifies both snapshots, restores the databases, catches Zakura
+up to the network, and starts lightwalletd. Later starts reuse the data;
+interrupted downloads resume.
+
+**Plan for SSD storage, 4 CPU cores, 16 GiB RAM, and a 1 TB data disk.** The
+initial download is approximately 300 GB as of November 2026, with additional
+space required during extraction. First startup can take hours.
+
+Linux amd64 is the tested platform. Docker Desktop users must allocate these
+resources to Docker's VM. On Windows, use Linux containers and run the commands
+in WSL 2. Apple Silicon uses amd64 emulation; native arm64 is not currently
+supported, and a full mainnet restore under emulation has not been validated.
+
+## Check readiness and connect
 
 ```bash
-sudo \
-  CONTAINER_NAME=lightwalletd \
-  DATA_DIR=/var/lib/lightwalletd \
-  ./scripts/create-snapshot.sh ./snapshots
+docker compose logs -f --tail=100
+docker inspect --format '{{.State.Health.Status}}' zovereign
 ```
 
-The source container is quiesced while its database is archived to guarantee
-consistency. Persistent containers are stopped; auto-remove containers are
-paused so Docker does not delete them. A cleanup trap resumes the source if
-creation succeeds, fails, or is interrupted.
+Health remains `starting` during bootstrap. `healthy` means the node is near
+the network tip and lightwalletd can serve an actual compact block through it.
 
-The command creates:
+Point a local wallet or gRPC client that supports a custom plaintext server at
+`127.0.0.1:9067`. The default gRPC port is bound to your machine's loopback
+interface. Port `8233` accepts Zcash peers; node RPC stays private inside the
+container. For remote wallets, use a trusted tunnel or configure TLS using
+[the deployment guide](docs/single-container.md#serving-remote-clients-with-tls).
 
-```text
-snapshot.tar.zst
-snapshot.tar.zst.sha256
-snapshot.tar.zst.info
-```
-
-Upload these files to an ordinary HTTP server or copy them directly to the restore host.
-
-## 2. Restore and start lightwalletd
-
-From an HTTPS URL:
+The container includes grpcurl, so you can also query it directly:
 
 ```bash
-sudo \
-  RPC_HOST=zakura \
-  RPC_PORT=8232 \
-  RPC_USER=lightwalletd \
-  RPC_PASSWORD='replace-me' \
-  DOCKER_NETWORK=zakura_default \
-  ./scripts/start-from-snapshot.sh \
-  https://example.com/lightwalletd-mainnet-v0.5.4-TIMESTAMP.tar.zst
+docker exec zovereign grpcurl -plaintext 127.0.0.1:9067 \
+  cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLightdInfo
 ```
 
-From a local file:
+## Stop, resume, and update
 
 ```bash
-sudo \
-  RPC_HOST=zakura \
-  RPC_PASSWORD='replace-me' \
-  DOCKER_NETWORK=zakura_default \
-  ./scripts/start-from-snapshot.sh \
-  ./lightwalletd-mainnet-v0.5.4-TIMESTAMP.tar.zst
+docker compose stop          # Gracefully stop both services; keep data.
+docker compose start         # Resume using the same databases.
 ```
 
-Defaults:
-
-```text
-CONTAINER_NAME=lightwalletd
-VOLUME_NAME=lightwalletd-data
-IMAGE=electriccoinco/lightwalletd:v0.5.4
-DATA_DIR=/var/lib/lightwalletd
-GRPC_PORT=9067
-RPC_PORT=8232
-RPC_USER=lightwalletd
-START_TIMEOUT=60
-```
-
-`RPC_HOST` and `RPC_PASSWORD` are required. `DOCKER_NETWORK` is required when `RPC_HOST` is the name of another Docker container.
-
-The restore command refuses to overwrite an existing container or volume. For an isolated test, choose different names and a different host port:
+To update the source and recreate the container:
 
 ```bash
-sudo \
-  CONTAINER_NAME=lightwalletd-snapshot-test \
-  VOLUME_NAME=lightwalletd-snapshot-test-data \
-  GRPC_PORT=19067 \
-  RPC_HOST=zakura \
-  RPC_PASSWORD='replace-me' \
-  DOCKER_NETWORK=zakura_default \
-  ./scripts/start-from-snapshot.sh ./snapshot.tar.zst
+git pull --ff-only
+docker compose up -d --build
 ```
 
-`FORCE=1` removes an existing target container and volume permanently. Do not use it against a deployment containing data you need.
+The persistent volume is named `zovereign-data`. Keep it across updates.
+`docker compose down` also keeps it; **`docker compose down -v` permanently
+deletes the databases and download progress**. Check release notes before
+updating database versions; an incompatible database is refused rather than
+silently replaced.
 
-## Security limitations
+## Configure and learn more
 
-The checksum detects accidental corruption but does not authenticate the publisher. Only use snapshots obtained from a source you trust. Signed manifests remain deferred.
+The defaults work without a configuration file. Optionally copy `.env.example`
+to `.env` to change host ports, download concurrency, or the disk reserve, then
+run `docker compose up -d --build` to apply changes.
 
-See [`PLAN.md`](PLAN.md) for scope and acceptance criteria.
+- [Deployment guide](docs/single-container.md): plain Docker commands, storage,
+  recovery, configuration, TLS, and full-mainnet validation.
+- [Contributing](CONTRIBUTING.md): build and run the small fixture tests without
+  downloading the blockchain, plus image publication instructions.
+- [Agent instructions](AGENTS.md): repository map and implementation invariants.
+- [Snapshot creation and publishing](docs/snapshot-publishing.md): maintain the
+  publisher or restore standalone lightwalletd against an existing RPC server.
 
-## Automated daily publication to Amazon S3
+This image bundles Zakura **1.8.7** (archive database major **30**) and
+lightwalletd **v0.6.0**, with upstream images pinned by digest. It passed 16
+bootstrap and lifecycle tests and a complete mainnet restore on a clean Linux
+VPS on 14 November 2026. lightwalletd loaded **3,571,794 cached blocks**, served
+blocks near the bundled node's tip, and restarted without downloading again.
 
-The repository includes:
-
-- [`infra/snapshot-storage.yaml`](infra/snapshot-storage.yaml), which creates a
-  private, encrypted, versioned S3 bucket with retention controls and attaches
-  prefix-scoped publication permissions through its bucket policy without
-  modifying the Terraform-managed source EC2 role.
-- [`scripts/publish-to-s3.sh`](scripts/publish-to-s3.sh), which uploads a
-  snapshot and its sidecars before atomically publishing `latest.json`.
-- [`.github/workflows/daily-snapshot.yml`](.github/workflows/daily-snapshot.yml),
-  which runs daily on the dedicated source-host GitHub Actions runner.
-
-The restore command also accepts an authenticated S3 URI:
-
-```bash
-sudo \
-  RPC_HOST=zakura \
-  RPC_PASSWORD='replace-me' \
-  DOCKER_NETWORK=zakura_default \
-  ./scripts/start-from-snapshot.sh \
-  s3://BUCKET/mainnet/v0.5.4/snapshots/TIMESTAMP/snapshot.tar.zst
-```
-
-S3 remains private. Publishing and direct S3 restores require an instance role
-or another short-lived identity authorized for the snapshot key prefix. Public
-downloads are served only through the stack's CloudFront distribution.
-
-Discover and download the latest public snapshot with resumable transfers:
-
-```bash
-BASE_URL="https://d2t6ule2qr31fe.cloudfront.net"
-PREFIX="mainnet/v0.5.4"
-
-curl -fsSL "$BASE_URL/$PREFIX/latest.json" -o latest.json
-SNAPSHOT_KEY="$(jq -r '.snapshot_key' latest.json)"
-CHECKSUM_KEY="$(jq -r '.checksum_key' latest.json)"
-EXPECTED_SHA256="$(jq -r '.sha256' latest.json)"
-
-curl -fL --continue-at - "$BASE_URL/$SNAPSHOT_KEY" -o snapshot.tar.zst
-curl -fsSL "$BASE_URL/$CHECKSUM_KEY" -o snapshot.tar.zst.sha256
-SIDECAR_SHA256="$(awk 'NR == 1 {print $1}' snapshot.tar.zst.sha256)"
-test "$SIDECAR_SHA256" = "$EXPECTED_SHA256"
-printf '%s  snapshot.tar.zst\n' "$EXPECTED_SHA256" | sha256sum --check
-```
-
-The deployment also exposes this host as the `SnapshotDownloadDomain`
-CloudFormation output. Timestamped archives are immutable and cacheable;
-`latest.json` is deliberately not cached.
-
-The restore script accepts an archive URL directly and automatically retrieves
-its checksum sidecar:
-
-```bash
-sudo \
-  RPC_HOST=zakura \
-  RPC_PASSWORD='replace-me' \
-  DOCKER_NETWORK=zakura_default \
-  ./scripts/start-from-snapshot.sh \
-  "https://d2t6ule2qr31fe.cloudfront.net/$SNAPSHOT_KEY"
-```
+Snapshots skip the initial historical sync, so their imported history depends
+on the publishers. SHA-256 verifies download integrity; it does not authenticate
+the publisher. See the guide's
+[trust boundary](docs/single-container.md#trust-and-validation-boundary).

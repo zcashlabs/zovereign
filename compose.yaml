@@ -1,0 +1,28 @@
+name: zovereign
+
+services:
+  zovereign:
+    image: zovereign:local
+    build:
+      context: .
+    platform: linux/amd64
+    container_name: zovereign
+    restart: unless-stopped
+    stop_grace_period: 2m
+    environment:
+      DOWNLOAD_WORKERS: ${DOWNLOAD_WORKERS:-3}
+      DISK_RESERVE_GIB: ${DISK_RESERVE_GIB:-20}
+    ports:
+      - "${P2P_BIND_IP:-0.0.0.0}:${P2P_PORT:-8233}:8233"
+      - "${GRPC_BIND_IP:-127.0.0.1}:${GRPC_PORT:-9067}:9067"
+    volumes:
+      - zovereign-data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+volumes:
+  zovereign-data:
+    name: zovereign-data

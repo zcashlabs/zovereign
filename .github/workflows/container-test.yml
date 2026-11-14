@@ -1,0 +1,76 @@
+name: Build, test, and publish container
+
+on:
+  push:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - compose.yaml
+      - .env.example
+      - docker/**
+      - tests/**
+      - README.md
+      - CONTRIBUTING.md
+      - AGENTS.md
+      - CLAUDE.md
+      - docs/**
+      - .github/workflows/container-test.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - compose.yaml
+      - .env.example
+      - docker/**
+      - tests/**
+      - README.md
+      - CONTRIBUTING.md
+      - AGENTS.md
+      - CLAUDE.md
+      - docs/**
+      - .github/workflows/container-test.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate local deployment configuration
+        run: docker compose config --quiet
+      - name: Build pinned runtime image
+        run: |
+          docker build --platform linux/amd64 -t zovereign:test \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+      - name: Test bootstrap and supervision inside the image
+        run: |
+          docker run --rm --entrypoint python3 \
+            -e STACK_MODULE=/opt/zovereign/stack.py \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/tests,readonly" \
+            zovereign:test /tests/test_stack.py
+      - name: Publish the tested image
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag zovereign:test "$image:sha-$GITHUB_SHA"
+          docker push "$image:sha-$GITHUB_SHA"
+          docker tag zovereign:test "$image:latest"
+          docker push "$image:latest"
+          printf 'Tested Linux amd64 image: `%s:sha-%s`\n\nFirst publication requires a package administrator to enable Public visibility for anonymous pulls.\n' \
+            "$image" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

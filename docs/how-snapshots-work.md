@@ -1,5 +1,10 @@
 # How lightwalletd snapshots work
 
+This document records the earlier standalone prototype and AWS publication
+design and tests. For the current combined Zakura/lightwalletd image and its
+full-mainnet validation, see [the single-container guide](single-container.md).
+Current DigitalOcean publication is described in [the README](../README.md).
+
 This document explains the design and behavior of the snapshot system in this
 repository. It covers what is saved, why restoring it accelerates startup, how
 consistency is maintained, how Docker is used during restoration, and how the
