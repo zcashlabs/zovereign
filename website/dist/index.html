@@ -148,28 +148,32 @@ docker compose up -d --build</code></pre>
       </div>
     </div>
 
-    <div class="after">
-      <div class="after-step">
-        <p class="step-no">Then · watch it work</p>
+    <ol class="after" aria-label="Connect your wallet in three steps" role="list">
+      <li class="after-step">
+        <h3>Check logs</h3>
+        <p class="after-note">Follow the download and startup progress.</p>
         <div class="code sm">
           <div class="code-bar"><span class="code-name">logs</span><button class="copy" type="button" data-copy="cmd-logs" hidden><span class="copy-label">Copy</span></button></div>
 <pre id="cmd-logs"><code>docker logs -f --tail=100 zovereign</code></pre>
         </div>
-      </div>
-      <div class="after-step">
-        <p class="step-no">Then · ask if it’s ready</p>
+        <span class="after-arrow" aria-hidden="true">→</span>
+      </li>
+      <li class="after-step">
+        <h3>Wait for healthy</h3>
+        <p class="after-note">Check until the status changes from <code>starting</code> to <code>healthy</code>.</p>
         <div class="code sm">
           <div class="code-bar"><span class="code-name">health</span><button class="copy" type="button" data-copy="cmd-health" hidden><span class="copy-label">Copy</span></button></div>
 <pre id="cmd-health"><code>docker inspect --format '{{.State.Health.Status}}' zovereign</code></pre>
         </div>
-        <p class="after-note"><code>starting</code> during bootstrap. <code>healthy</code> once the node is near tip and a real compact block came back.</p>
-      </div>
-      <div class="after-step">
-        <p class="step-no">Then · point a wallet at it</p>
+        <span class="after-arrow" aria-hidden="true">→</span>
+      </li>
+      <li class="after-step">
+        <h3>Connect your wallet</h3>
+        <p class="after-note">Once healthy, set your wallet’s custom server to:</p>
         <p class="endpoint"><code>127.0.0.1:9067</code></p>
-        <p class="after-note">Any wallet or gRPC client that supports a custom plaintext server. For other machines, use a trusted tunnel or <a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#serving-remote-clients-with-tls">configure TLS</a>.</p>
-      </div>
-    </div>
+        <p class="after-note">Use a wallet that supports plaintext connections. For remote access, use a trusted tunnel or <a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#serving-remote-clients-with-tls">configure TLS</a>.</p>
+      </li>
+    </ol>
     <p class="keep"><strong>Keep the volume.</strong> Stop gracefully with <code>docker stop -t 120 zovereign</code>. Removing or replacing the container keeps <code>zovereign-data</code>; deleting the volume means downloading ~300 GB again.</p>
     <p class="docs-cta"><a class="btn btn-gold" href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md">Read the deployment guide <span aria-hidden="true">→</span></a> <span>Updating, storage, recovery, configuration and TLS.</span></p>
   </div>
