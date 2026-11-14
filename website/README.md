@@ -52,7 +52,8 @@ canonical and Open Graph URLs in `index.html`.
   integrity, not publisher authenticity.
 - Never show `docker compose down -v` as an ordinary stop command. It
   deletes the persistent volume.
-- The hero's isometric drawing was generated once from isometric coordinates
-  and pasted inline. Edit the SVG directly. Classes such as `.zak-t`
-  (top face), `.zak-l` (left face) and `.zak-r` (right face) map each face to
-  a colour token in `styles.css`.
+- The hero uses a simple inline SVG: one container holding the Zakura archive
+  node and lightwalletd, with wallets connected to lightwalletd. Edit the SVG
+  directly; its `.stack-*` styles use the page's colour and typography tokens.
+  Keep snapshot bootstrap described accurately; the image does not rebuild
+  historical state from genesis.

@@ -73,7 +73,7 @@
     <div class="hero-copy">
       <p class="kicker"><span class="dot" aria-hidden="true"></span> Self-hosted Zcash infrastructure · one Docker image</p>
       <h1 id="hero-title" class="display">Run your own Zcash stack.</h1>
-      <p class="lede">Zovereign restores a mainnet <strong>archive node</strong> and <strong>lightwalletd</strong> from published snapshots, wires them together over a private loopback RPC, and hands your wallet a gRPC endpoint on your own machine. One container. One volume. Nobody else’s server in the middle.</p>
+      <p class="lede">Zovereign lets you run your own <strong>lightwalletd</strong> and <strong>Zcash archive full node</strong> with a single command. Connect your wallets directly to your own infrastructure, transact without relying on a third-party RPC provider, and build privacy-focused applications on top.</p>
       <div class="hero-actions">
         <a class="btn btn-gold" href="#install">Get the one-liner <span aria-hidden="true">→</span></a>
         <a class="btn btn-ghost" href="#how">See how it boots</a>
@@ -86,116 +86,42 @@
       </dl>
     </div>
     <figure class="hero-fig">
-      <svg class="iso" viewBox="0 0 720 650" role="img" aria-labelledby="fig1-t fig1-d">
-        <title id="fig1-t">Fig. 1: Zovereign, exploded view</title>
-        <desc id="fig1-d">An isometric drawing of one dashed container holding three stacked layers: a persistent data volume at the bottom, the Zakura archive node in the middle, and lightwalletd on top, joined by a private loopback RPC pipe. Two snapshot crates descend into the container from above. Port 8233 for peers and port 9067 for wallets protrude from the right side.</desc>
-        <defs>
-          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><line x1="0" y1="0" x2="0" y2="6" class="hatch-line"/></pattern>
-        </defs>
-        <g class="hull-back">
-        <line class="hull" x1="330.0" y1="405.2" x2="554.8" y2="535.0"/>
-        <line class="hull" x1="330.0" y1="405.2" x2="162.3" y2="502.0"/>
-        <line class="hull" x1="330.0" y1="405.2" x2="330.0" y2="143.4"/>
+      <svg class="stack-illustration" viewBox="0 0 600 575" role="img" aria-labelledby="fig1-t fig1-d">
+        <title id="fig1-t">One box. Your Zcash infrastructure.</title>
+        <desc id="fig1-d">One Zovereign container runs a Zakura full archive node and lightwalletd. The node supplies lightwalletd inside the box. Your Zcash wallets connect directly to lightwalletd on your own infrastructure. Both services bootstrap from published snapshots.</desc>
+
+        <rect class="stack-box" x="100" y="48" width="400" height="304" rx="18"/>
+        <text class="stack-brand" x="300" y="88" text-anchor="middle">ZOVEREIGN</text>
+        <path class="stack-rule" d="M124 108 H476"/>
+
+        <rect class="stack-node" x="130" y="128" width="340" height="86" rx="10"/>
+        <text class="stack-service stack-service-light" x="300" y="166" text-anchor="middle">Full archive node</text>
+        <text class="stack-detail" x="300" y="194" text-anchor="middle">Zakura</text>
+
+        <path class="stack-link" d="M300 214 V245 M294 238 L300 245 L306 238"/>
+
+        <rect class="stack-lightwalletd" x="130" y="247" width="340" height="72" rx="10"/>
+        <text class="stack-service" x="300" y="292" text-anchor="middle">lightwalletd</text>
+        <path class="stack-link" d="M300 319 V352"/>
+
+        <path class="stack-wallet-link" d="M300 352 V394 M180 428 V394 H420 V444"/>
+        <circle class="stack-port" cx="300" cy="352" r="5"/>
+
+        <g aria-hidden="true">
+          <rect class="stack-device" x="148" y="428" width="64" height="100" rx="11"/>
+          <rect class="stack-screen" x="156" y="442" width="48" height="66" rx="3"/>
+          <path class="stack-rule" d="M174 435 H186"/>
+          <circle class="stack-device-dot" cx="180" cy="518" r="3"/>
+          <text class="stack-wallet-mark" x="180" y="482" text-anchor="middle">ZEC</text>
+
+          <rect class="stack-device" x="366" y="444" width="108" height="70" rx="7"/>
+          <rect class="stack-screen" x="374" y="452" width="92" height="50" rx="2"/>
+          <path class="stack-laptop-base" d="M350 514 H490 L482 525 H358 Z"/>
+          <text class="stack-wallet-mark" x="420" y="485" text-anchor="middle">ZEC</text>
         </g>
-        <polygon class="shadow" points="330.0,405.2 554.8,535.0 387.2,631.8 162.3,502.0"/>
-        <g class="part" data-part="volume">
-        <polygon class="vol-r" points="520.5,524.0 387.2,601.0 387.2,561.4 520.5,484.4"/><polygon class="vol-l" points="196.6,491.0 387.2,601.0 387.2,561.4 196.6,451.4"/><polygon class="vol-t" points="330.0,374.4 520.5,484.4 387.2,561.4 196.6,451.4"/>
-        <polygon class="disk" points="408.1,496.5 401.2,500.0 393.6,502.9 385.4,505.3 376.7,507.0 367.7,508.0 358.6,508.3 349.4,508.0 340.4,507.0 331.8,505.3 323.6,502.9 315.9,500.0 309.0,496.5 303.0,492.5 297.9,488.1 293.9,483.4 290.9,478.4 289.1,473.2 288.5,467.9 289.1,462.6 290.9,457.4 293.9,452.4 297.9,447.7 303.0,443.3 309.0,439.3 315.9,435.8 323.6,432.9 331.8,430.5 340.4,428.8 349.4,427.8 358.6,427.5 367.7,427.8 376.7,428.8 385.4,430.5 393.6,432.9 401.2,435.8 408.1,439.3 414.2,443.3 419.2,447.7 423.3,452.4 426.2,457.4 428.0,462.6 428.6,467.9 428.0,473.2 426.2,478.4 423.3,483.4 419.2,488.1 414.2,492.5"/>
-        <polygon class="disk" points="394.8,488.8 389.7,491.3 384.2,493.5 378.2,495.2 371.8,496.4 365.3,497.2 358.6,497.5 351.9,497.2 345.3,496.4 339.0,495.2 333.0,493.5 327.4,491.3 322.4,488.8 318.0,485.9 314.2,482.7 311.3,479.2 309.1,475.5 307.8,471.8 307.4,467.9 307.8,464.0 309.1,460.3 311.3,456.6 314.2,453.1 318.0,449.9 322.4,447.0 327.4,444.5 333.0,442.3 339.0,440.6 345.3,439.4 351.9,438.6 358.6,438.3 365.3,438.6 371.8,439.4 378.2,440.6 384.2,442.3 389.7,444.5 394.8,447.0 399.2,449.9 402.9,453.1 405.9,456.6 408.0,460.3 409.3,464.0 409.8,467.9 409.3,471.8 408.0,475.5 405.9,479.2 402.9,482.7 399.2,485.9"/>
-        <polygon class="disk" points="381.4,481.1 378.3,482.7 374.7,484.1 371.0,485.1 366.9,485.9 362.8,486.4 358.6,486.6 354.4,486.4 350.2,485.9 346.2,485.1 342.4,484.1 338.9,482.7 335.7,481.1 332.9,479.3 330.6,477.2 328.7,475.0 327.3,472.7 326.5,470.3 326.2,467.9 326.5,465.5 327.3,463.1 328.7,460.8 330.6,458.6 332.9,456.5 335.7,454.7 338.9,453.1 342.4,451.7 346.2,450.7 350.2,449.9 354.4,449.4 358.6,449.2 362.8,449.4 366.9,449.9 371.0,450.7 374.7,451.7 378.3,453.1 381.4,454.7 384.2,456.5 386.6,458.6 388.5,460.8 389.8,463.1 390.6,465.5 390.9,467.9 390.6,470.3 389.8,472.7 388.5,475.0 386.6,477.2 384.2,479.3"/>
-        <polygon class="disk" points="368.1,473.4 366.8,474.1 365.3,474.6 363.7,475.1 362.1,475.4 360.3,475.6 358.6,475.7 356.8,475.6 355.1,475.4 353.4,475.1 351.8,474.6 350.4,474.1 349.1,473.4 347.9,472.6 346.9,471.8 346.1,470.9 345.6,469.9 345.2,468.9 345.1,467.9 345.2,466.9 345.6,465.9 346.1,464.9 346.9,464.0 347.9,463.2 349.1,462.4 350.4,461.7 351.8,461.2 353.4,460.7 355.1,460.4 356.8,460.2 358.6,460.1 360.3,460.2 362.1,460.4 363.7,460.7 365.3,461.2 366.8,461.7 368.1,462.4 369.3,463.2 370.2,464.0 371.0,464.9 371.6,465.9 371.9,466.9 372.1,467.9 371.9,468.9 371.6,469.9 371.0,470.9 370.2,471.8 369.3,472.6"/>
-        <line class="vol-rule" x1="202.3" y1="484.4" x2="381.4" y2="587.8"/>
-        <line class="vol-rule" x1="202.3" y1="474.5" x2="381.4" y2="577.9"/>
-        <line class="vol-rule" x1="202.3" y1="464.6" x2="381.4" y2="568.0"/>
-        <text class="face-txt light" transform="matrix(0.8660,0.5,0,1,206.2,482.9)">zovereign-data → /data</text>
-        </g>
-        <line class="pipe-bg" x1="238.5" y1="453.6" x2="238.5" y2="427.2"/>
-        <line class="pipe-bg" x1="257.6" y1="464.6" x2="257.6" y2="438.2"/>
-        <g class="part" data-part="zakura">
-        <polygon class="zak-r" points="520.5,458.0 387.2,535.0 387.2,460.2 520.5,383.2"/><polygon class="zak-l" points="196.6,425.0 387.2,535.0 387.2,460.2 196.6,350.2"/><polygon class="zak-t" points="330.0,273.2 520.5,383.2 387.2,460.2 196.6,350.2"/>
-        <polygon class="blk-r" points="259.5,346.9 236.6,360.1 236.6,346.9 259.5,333.7"/><polygon class="blk-l" points="219.5,350.2 236.6,360.1 236.6,346.9 219.5,337.0"/><polygon class="blk-t" points="242.4,323.8 259.5,333.7 236.6,346.9 219.5,337.0"/>
-        <line class="chain" x1="248.1" y1="346.9" x2="258.6" y2="353.0"/>
-        <polygon class="blk-r" points="287.1,362.8 264.3,376.1 264.3,362.9 287.1,349.6"/><polygon class="blk-l" points="247.1,366.1 264.3,376.1 264.3,362.9 247.1,352.9"/><polygon class="blk-t" points="270.0,339.8 287.1,349.6 264.3,362.9 247.1,352.9"/>
-        <line class="chain" x1="275.7" y1="362.9" x2="286.2" y2="368.9"/>
-        <polygon class="blk-r" points="314.8,378.8 291.9,392.0 291.9,378.8 314.8,365.6"/><polygon class="blk-l" points="274.7,382.1 291.9,392.0 291.9,378.8 274.7,368.9"/><polygon class="blk-t" points="297.6,355.7 314.8,365.6 291.9,378.8 274.7,368.9"/>
-        <line class="chain" x1="303.3" y1="378.8" x2="313.8" y2="384.9"/>
-        <polygon class="blk-r" points="342.4,394.7 319.5,407.9 319.5,394.8 342.4,381.5"/><polygon class="blk-l" points="302.4,398.1 319.5,407.9 319.5,394.8 302.4,384.9"/><polygon class="blk-t" points="325.2,371.6 342.4,381.5 319.5,394.8 302.4,384.9"/>
-        <line class="chain" x1="331.0" y1="394.8" x2="341.4" y2="400.8"/>
-        <polygon class="blk-r" points="370.0,410.7 347.1,423.9 347.1,410.7 370.0,397.5"/><polygon class="blk-l" points="330.0,414.0 347.1,423.9 347.1,410.7 330.0,400.8"/><polygon class="blk-t" points="352.9,387.6 370.0,397.5 347.1,410.7 330.0,400.8"/>
-        <polygon class="panel" points="206.2,419.5 316.7,483.3 316.7,430.5 206.2,366.7"/>
-        <text class="face-txt big" transform="matrix(0.8660,0.5,0,1,212.8,390.4)">ZAKURA 1.8.7</text>
-        <text class="face-txt" transform="matrix(0.8660,0.5,0,1,212.8,409.1)">ARCHIVE · DB 30</text>
-        <line class="led on" x1="330.0" y1="464.6" x2="334.8" y2="467.4"/>
-        <line class="led" x1="340.5" y1="470.6" x2="345.2" y2="473.4"/>
-        <line class="led" x1="351.0" y1="476.7" x2="355.7" y2="479.5"/>
-        <line class="led" x1="361.4" y1="482.8" x2="366.2" y2="485.5"/>
-        <line class="led" x1="371.9" y1="488.8" x2="376.7" y2="491.6"/>
-        <line class="vent" x1="509.1" y1="451.4" x2="509.1" y2="403.0"/>
-        <line class="vent" x1="502.4" y1="455.3" x2="502.4" y2="406.9"/>
-        <line class="vent" x1="495.8" y1="459.1" x2="495.8" y2="410.7"/>
-        <line class="vent" x1="489.1" y1="462.9" x2="489.1" y2="414.5"/>
-        <line class="vent" x1="482.4" y1="466.8" x2="482.4" y2="418.4"/>
-        <line class="vent" x1="475.8" y1="470.7" x2="475.8" y2="422.2"/>
-        </g>
-        <g class="part" data-part="rpc">
-        <line class="pipe-bg" x1="387.2" y1="438.2" x2="387.2" y2="389.8"/>
-        <line class="pipe-flow" x1="387.2" y1="438.2" x2="387.2" y2="389.8"/>
-        </g>
-        <g class="part" data-part="lwd">
-        <polygon class="lwd-r" points="520.5,334.8 387.2,411.8 387.2,376.6 520.5,299.6"/><polygon class="lwd-l" points="196.6,301.8 387.2,411.8 387.2,376.6 196.6,266.6"/><polygon class="lwd-t" points="330.0,189.6 520.5,299.6 387.2,376.6 196.6,266.6"/>
-        <polygon class="card" points="330.0,207.2 354.8,221.5 330.0,235.8 305.2,221.5"/>
-        <polygon class="card" points="363.3,226.5 388.1,240.8 363.3,255.1 338.6,240.8"/>
-        <polygon class="card" points="396.7,245.7 421.5,260.0 396.7,274.3 371.9,260.0"/>
-        <polygon class="card" points="430.0,265.0 454.8,279.2 430.0,293.6 405.3,279.2"/>
-        <polygon class="card" points="463.4,284.2 488.1,298.5 463.4,312.8 438.6,298.5"/>
-        <polygon class="card" points="293.8,228.1 318.6,242.4 293.8,256.7 269.0,242.4"/>
-        <polygon class="card" points="327.1,247.4 351.9,261.7 327.1,276.0 302.4,261.7"/>
-        <polygon class="card" points="360.5,266.6 385.3,280.9 360.5,295.2 335.7,280.9"/>
-        <polygon class="card" points="393.8,285.9 418.6,300.1 393.8,314.5 369.1,300.1"/>
-        <polygon class="card" points="427.2,305.1 451.9,319.4 427.2,333.7 402.4,319.4"/>
-        <polygon class="card" points="257.6,249.0 282.4,263.3 257.6,277.6 232.8,263.3"/>
-        <polygon class="card" points="290.9,268.2 315.7,282.6 290.9,296.9 266.2,282.6"/>
-        <polygon class="card" points="324.3,287.5 349.1,301.8 324.3,316.1 299.5,301.8"/>
-        <polygon class="card" points="357.6,306.8 382.4,321.1 357.6,335.4 332.9,321.1"/>
-        <polygon class="card" points="391.0,326.0 415.7,340.3 391.0,354.6 366.2,340.3"/>
-        <text class="face-txt big ink" transform="matrix(0.8660,0.5,0,1,206.2,297.4)">LIGHTWALLETD v0.6.0</text>
-        </g>
-        <g class="part" data-part="p2p">
-        <polygon class="port-g-r" points="512.9,491.0 493.9,502.0 493.9,484.4 512.9,473.4"/><polygon class="port-g-l" points="444.3,473.4 493.9,502.0 493.9,484.4 444.3,455.8"/><polygon class="port-g-t" points="463.4,444.8 512.9,473.4 493.9,484.4 444.3,455.8"/>
-        <text class="port-txt light" transform="matrix(0.8660,-0.5,0,1,493.9,498.7)">8233</text>
-        </g>
-        <g class="part" data-part="grpc">
-        <polygon class="port-y-r" points="512.9,387.6 493.9,398.6 493.9,381.0 512.9,370.0"/><polygon class="port-y-l" points="444.3,370.0 493.9,398.6 493.9,381.0 444.3,352.4"/><polygon class="port-y-t" points="463.4,341.4 512.9,370.0 493.9,381.0 444.3,352.4"/>
-        <text class="port-txt" transform="matrix(0.8660,-0.5,0,1,493.9,395.3)">9067</text>
-        </g>
-        <g class="hull-front">
-        <line class="hull" x1="554.8" y1="535.0" x2="387.2" y2="631.8"/>
-        <line class="hull" x1="162.3" y1="502.0" x2="387.2" y2="631.8"/>
-        <line class="hull" x1="387.2" y1="631.8" x2="387.2" y2="370.0"/>
-        <line class="hull" x1="554.8" y1="535.0" x2="554.8" y2="273.2"/>
-        <line class="hull" x1="162.3" y1="502.0" x2="162.3" y2="240.2"/>
-        <line class="hull" x1="330.0" y1="143.4" x2="554.8" y2="273.2"/>
-        <line class="hull" x1="330.0" y1="143.4" x2="162.3" y2="240.2"/>
-        <line class="hull" x1="554.8" y1="273.2" x2="387.2" y2="370.0"/>
-        <line class="hull" x1="162.3" y1="240.2" x2="387.2" y2="370.0"/>
-        </g>
-        <g class="crate c1"><polygon class="crA-r" points="448.1,134.6 402.4,161.0 402.4,108.2 448.1,81.8"/><polygon class="crA-l" points="356.7,134.6 402.4,161.0 402.4,108.2 356.7,81.8"/><polygon class="crA-t" points="402.4,55.4 448.1,81.8 402.4,108.2 356.7,81.8"/><line class="strap" x1="379.5" y1="147.8" x2="379.5" y2="95.0"/><line class="strap" x1="425.3" y1="147.8" x2="425.3" y2="95.0"/>
-        <line class="drop" x1="402.4" y1="134.6" x2="402.4" y2="156.6"/></g>
-        <g class="crate c2"><polygon class="crB-r" points="533.9,201.7 505.3,218.2 505.3,185.2 533.9,168.7"/><polygon class="crB-l" points="476.7,201.7 505.3,218.2 505.3,185.2 476.7,168.7"/><polygon class="crB-t" points="505.3,152.2 533.9,168.7 505.3,185.2 476.7,168.7"/><line class="strap" x1="491.0" y1="209.9" x2="491.0" y2="176.9"/><line class="strap" x1="519.6" y1="209.9" x2="519.6" y2="176.9"/>
-        <line class="drop" x1="505.3" y1="201.7" x2="505.3" y2="219.3"/></g>
-        <g class="iso-labels" aria-hidden="true">
-          <g class="lbl"><path d="M196 56 H330 L366 84"/><circle cx="366" cy="84" r="3"/><text x="20" y="50" class="lbl-k">Archive snapshot</text><text x="20" y="66">Zakura · ≈275 GB</text></g>
-          <g class="lbl"><path d="M580 158 H560 L530 172"/><circle cx="530" cy="172" r="3"/><text x="586" y="152" class="lbl-k">Block cache</text><text x="586" y="168">lwd · ≈25 GB</text></g>
-          <g class="lbl"><path d="M150 224 L162 240"/><circle cx="162" cy="240" r="3"/><text x="20" y="214" class="lbl-k">One container</text><text x="20" y="230">runs as UID 10001</text></g>
-          <g class="lbl"><path d="M140 300 H196"/><circle cx="196" cy="300" r="3"/><text x="20" y="296" class="lbl-k">lightwalletd</text><text x="20" y="312">compact blocks</text></g>
-          <g class="lbl"><path d="M140 388 H196"/><circle cx="196" cy="388" r="3"/><text x="20" y="384" class="lbl-k">Zakura node</text><text x="20" y="400">mainnet archive</text></g>
-          <g class="lbl"><path d="M140 472 H196"/><circle cx="196" cy="472" r="3"/><text x="20" y="468" class="lbl-k">zovereign-data</text><text x="20" y="484">survives upgrades</text></g>
-          <g class="lbl"><path d="M580 364 H530 L512 382"/><circle cx="512" cy="382" r="3"/><text x="586" y="358" class="lbl-k">:9067 gRPC</text><text x="586" y="374">host loopback</text></g>
-          <g class="lbl"><path d="M580 424 H420 L396 412"/><circle cx="396" cy="412" r="3"/><text x="586" y="418" class="lbl-k">:8232 RPC</text><text x="586" y="434">never leaves</text></g>
-          <g class="lbl"><path d="M580 492 H512"/><circle cx="512" cy="490" r="3"/><text x="586" y="486" class="lbl-k">:8233 P2P</text><text x="586" y="502">Zcash peers</text></g>
-        </g>
+        <text class="stack-wallet-label" x="300" y="562" text-anchor="middle">Your Zcash wallets</text>
       </svg>
-      <figcaption><span class="fig-no">Fig. 1</span> The whole stack, exploded. In real life it is one container you start with one command.</figcaption>
+      <figcaption><span class="fig-no">Fig. 1</span> One box. Both services. Your wallets connect directly.</figcaption>
     </figure>
   </div>
 </section>
