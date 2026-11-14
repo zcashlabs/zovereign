@@ -50,7 +50,7 @@
       <p class="lede">Zovereign lets you run <strong>lightwalletd</strong> and a <strong>Zcash archive full node</strong> with one command. Connect your wallets to your own infrastructure, transact without a third-party RPC provider, and build privacy-focused apps.</p>
       <div class="hero-actions">
         <a class="btn btn-gold" href="#install">Get started <span aria-hidden="true">→</span></a>
-        <a class="btn btn-ghost" href="#how">How it works</a>
+        <a class="btn btn-ghost" href="#inside">How it works</a>
       </div>
       <dl class="spec-plate" aria-label="Bundled versions">
         <div><dt>Node</dt><dd>Zakura 1.8.7</dd></div>
@@ -179,83 +179,6 @@ docker compose up -d --build</code></pre>
   </div>
 </section>
 
-<!-- ============ HOW IT WORKS ============ -->
-<section class="how" id="how" aria-labelledby="how-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 id="how-title" class="h2">From two crates of history to a block in your wallet.</h2>
-      <p class="sec-intro">On first boot, Zovereign turns about 300 GB of compressed snapshots into a running node and wallet server. Every step is checked, resumable and boring in the best way. Here is the actual sequence.</p>
-    </div>
-
-    <div class="pipeline" aria-hidden="true">
-      <svg viewBox="0 0 1100 156" class="pipe-svg" preserveAspectRatio="xMidYMid meet">
-        <g class="pl-crate"><polygon points="40,52 82,30 124,52 82,74" class="crA-t"/><polygon points="40,52 82,74 82,122 40,100" class="crA-l"/><polygon points="124,52 82,74 82,122 124,100" class="crA-r"/><line x1="61" y1="63" x2="61" y2="111" class="strap"/><line x1="103" y1="63" x2="103" y2="111" class="strap"/></g>
-        <g class="pl-crate"><polygon points="140,72 166,58 192,72 166,86" class="crB-t"/><polygon points="140,72 166,86 166,116 140,102" class="crB-l"/><polygon points="192,72 166,86 166,116 192,102" class="crB-r"/></g>
-        <path class="pl-track" d="M210 92 H930"/>
-        <path class="pl-flow" d="M210 92 H930"/>
-        <g class="pl-chunks"><rect x="236" y="84" width="26" height="16" rx="2"/><rect x="270" y="84" width="26" height="16" rx="2"/><rect x="304" y="84" width="26" height="16" rx="2" class="ghost"/></g>
-        <g class="pl-gate"><rect x="430" y="56" width="74" height="72" rx="8"/><text x="467" y="88" text-anchor="middle">SHA</text><text x="467" y="106" text-anchor="middle">256</text></g>
-        <g class="pl-stage"><rect x="590" y="60" width="96" height="64" rx="6"/><text x="638" y="97" text-anchor="middle">staging/</text></g>
-        <g class="pl-node"><rect x="770" y="50" width="70" height="84" rx="6" class="zak"/><rect x="852" y="50" width="70" height="84" rx="6" class="lwd"/><line x1="840" y1="92" x2="852" y2="92" class="pl-rpc"/></g>
-        <text x="826" y="98" class="pl-in" text-anchor="middle">RPC</text>
-        <g class="pl-cap"><text x="116" y="146">snapshots</text><text x="283" y="146">ranges</text><text x="467" y="146">verify</text><text x="638" y="146">stage</text><text x="846" y="146">node + lwd</text><text x="1035" y="146">healthy</text></g>
-        <g class="pl-out"><path d="M932 92 H1000"/><rect x="1004" y="64" width="62" height="56" rx="10"/><rect x="1018" y="80" width="34" height="22" rx="3" class="blk"/><path d="M1026 92 l5 5 l10 -11" class="tick"/></g>
-      </svg>
-    </div>
-
-    <ol class="steps">
-      <li class="step">
-        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="14" y="10" width="32" height="44" rx="3" class="g-paper"/><path d="M20 22h20M20 30h20M20 38h12" class="g-ink"/><circle cx="44" cy="14" r="7" class="g-gold"/><path d="M44 21v12" class="g-ink"/></svg>
-        <p class="step-no">01 · Pin</p>
-        <h3>Pick a snapshot and stick to it.</h3>
-        <p>The latest compatible mainnet archive is chosen from the Zakura manifest, and the latest lightwalletd cache from its own. Each choice is pinned to disk, so a restart finishes the same snapshot even if “latest” moves.</p>
-      </li>
-      <li class="step">
-        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="14" width="48" height="8" rx="2" class="g-green"/><rect x="8" y="27" width="48" height="8" rx="2" class="g-green"/><rect x="8" y="40" width="30" height="8" rx="2" class="g-gold"/><rect x="38" y="40" width="18" height="8" rx="2" class="g-paper"/><path d="M50 52v8m-4-4l4 4 4-4" class="g-ink"/></svg>
-        <p class="step-no">02 · Fetch</p>
-        <h3>Download in checked ranges.</h3>
-        <p>256 MiB HTTP ranges, parallel connections and retries. Offsets and sizes are verified and bytes commit in order to a <code>.part</code> file, so an interruption costs you minutes, not the whole download.</p>
-      </li>
-      <li class="step">
-        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6l6 5 8-1 2 8 7 4-3 7 3 7-7 4-2 8-8-1-6 5-6-5-8 1-2-8-7-4 3-7-3-7 7-4 2-8 8 1z" class="g-gold"/><path d="M23 32l6 6 12-13" class="g-ink thick"/></svg>
-        <p class="step-no">03 · Verify</p>
-        <h3>Hash every byte.</h3>
-        <p>The complete compressed archive must match its SHA-256 before anything is unpacked. A mismatch throws the archive away instead of handing your node a corrupt history.</p>
-      </li>
-      <li class="step">
-        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="26" width="48" height="30" rx="3" class="g-dash"/><path d="M16 26l6-14h20l6 14" class="g-ink"/><rect x="20" y="34" width="10" height="10" class="g-green"/><rect x="34" y="34" width="10" height="10" class="g-gold"/></svg>
-        <p class="step-no">04 · Stage</p>
-        <h3>Unpack somewhere safe first.</h3>
-        <p>Extraction goes into a staging directory. Only regular files under the expected paths are accepted: no traversal, links or special files. The validated result is renamed into place, never sprayed over existing data.</p>
-      </li>
-      <li class="step">
-        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="12" y="12" width="40" height="40" rx="6" class="g-paper"/><text x="32" y="37" text-anchor="middle" class="g-txt">10001</text><path d="M18 18l28 28" class="g-ink faint"/></svg>
-        <p class="step-no">05 · Drop root</p>
-        <h3>Give up the keys to the building.</h3>
-        <p>The volume is locked against a second node, then bootstrap, Zakura and lightwalletd all run as UID/GID 10001. Nothing that talks to the network keeps root.</p>
-      </li>
-      <li class="step">
-        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="30" width="12" height="12" class="g-green"/><rect x="22" y="30" width="12" height="12" class="g-green"/><rect x="38" y="30" width="12" height="12" class="g-gold"/><path d="M18 36h4M34 36h4" class="g-ink"/><path d="M56 42V12l-6 4 6 4" class="g-ink"/></svg>
-        <p class="step-no">06 · Catch up</p>
-        <h3>Node first. Wait for the tip.</h3>
-        <p>Zakura starts in mainnet archive mode and must answer RPC within five blocks of its estimated network tip before anything else happens. It only has to process blocks newer than the snapshot.</p>
-      </li>
-      <li class="step">
-        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="10" width="44" height="44" rx="10" class="g-ink-fill"/><rect x="20" y="22" width="24" height="18" rx="2" class="g-gold"/><path d="M25 31l4 4 9-9" class="g-ink thick"/></svg>
-        <p class="step-no">07 · Serve</p>
-        <h3>Then the wallet server. Then proof.</h3>
-        <p>lightwalletd starts against loopback RPC with its compact-block cache already populated. Docker reports <code>healthy</code> only after it serves an actual block from one behind your node’s tip.</p>
-      </li>
-      <li class="step step-coda">
-        <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><path d="M48 22a18 18 0 1 0 3 14" class="g-ink thick"/><path d="M50 10v13H37" class="g-ink thick"/><circle cx="32" cy="32" r="6" class="g-gold"/></svg>
-        <p class="step-no">08 · Every boot after</p>
-        <h3>Skip steps 01–05 forever.</h3>
-        <p>A completed bootstrap is reused without contacting either snapshot publisher. From now on, startup is a node restart that catches up on whatever it missed, not a reinstall.</p>
-      </li>
-    </ol>
-  </div>
-</section>
-
 <!-- ============ INSIDE ============ -->
 <section class="inside" id="inside" aria-labelledby="inside-title">
   <div class="wrap">
@@ -355,48 +278,34 @@ docker compose up -d --build</code></pre>
   </div>
 </section>
 
-<!-- ============ EVIDENCE ============ -->
+<!-- ============ PERFORMANCE ============ -->
 <section class="evidence" id="evidence" aria-labelledby="ev-title">
   <div class="wrap">
     <div class="sec-head">
-      <h2 id="ev-title" class="h2">Field test, written down.</h2>
-      <p class="sec-intro">We ran the full thing against real mainnet snapshots on a clean Linux amd64 VPS (12 CPU threads, 32 GiB RAM, 1 TB SSD). These are dated results from that run, not a live counter.</p>
+      <h2 id="ev-title" class="h2">Performance</h2>
+      <p class="sec-intro">Mainnet startup on <time datetime="2026-11-14">14 November 2026</time>, using a Linux amd64 VPS with 12 CPU threads, 32 GiB RAM and a 1 TB SSD.</p>
     </div>
-    <article class="report" aria-labelledby="rep-title">
-      <header class="report-head">
-        <div>
-          <p class="report-k">Acceptance report</p>
-          <h3 id="rep-title">Full mainnet restore — passed</h3>
-        </div>
-        <p class="stamp" aria-label="Dated 14 November 2026"><span>Verified</span><time datetime="2026-11-14">14 Nov 2026</time></p>
-      </header>
-      <dl class="report-grid">
-        <div><dt>Zakura archive downloaded &amp; verified</dt><dd><span class="num">275,461,001,203</span> bytes</dd></div>
-        <div><dt>lightwalletd archive downloaded &amp; verified</dt><dd><span class="num">24,580,470,326</span> bytes</dd></div>
-        <div><dt>Blocks loaded from the imported cache</dt><dd><span class="num">3,571,794</span></dd></div>
-        <div><dt>Bootstrap, lifecycle &amp; bundled-binary tests</dt><dd><span class="num">16 / 16</span> on the VPS and GitHub CI</dd></div>
+    <div class="performance-card">
+      <dl class="performance-grid">
+        <div><dt>First startup</dt><dd>≈99 min</dd></div>
+        <div><dt>Zakura snapshot download</dt><dd>≈275 GB</dd></div>
+        <div><dt>lightwalletd snapshot download</dt><dd>≈24.6 GB</dd></div>
       </dl>
       <div class="timeline">
-        <p class="tl-title">Our development run, empty volume → <code>healthy</code>: <strong>≈99 min</strong></p>
-        <div class="tl-bar" role="img" aria-label="About 86 of 99 minutes went to downloading, verifying and restoring. The remainder included our own interruptions and fixes. Zakura caught up in about 40 seconds after restore.">
-          <span class="tl-seg dl" style="--w:86.9%"><b>download · verify · restore ≈86 min</b></span>
+        <p class="tl-title">Startup breakdown</p>
+        <div class="tl-bar" role="img" aria-label="About 86 minutes downloading, verifying and restoring snapshots. The remaining time included setup, development interruptions and fixes. Zakura caught up in about 40 seconds after restore.">
+          <span class="tl-seg dl" style="--w:86.9%"></span>
           <span class="tl-seg rest" style="--w:12.4%"></span>
           <span class="tl-seg tip" style="--w:0.7%"></span>
         </div>
         <ul class="tl-key">
-          <li><i class="k dl"></i>≈86 min moving and checking ~300 GB, then restoring</li>
-          <li><i class="k rest"></i>the rest, including our own interruptions and fixes</li>
-          <li><i class="k tip"></i>≈40 s for Zakura to catch up after restore</li>
+          <li><i class="k dl" aria-hidden="true"></i>Download, verify &amp; restore: ≈86 min</li>
+          <li><i class="k rest" aria-hidden="true"></i>Other setup and interruptions</li>
+          <li><i class="k tip" aria-hidden="true"></i>Zakura catch-up: ≈40 sec</li>
         </ul>
-        <p class="fine">This was one run on a fast, well-connected host. It is not a benchmark and we haven’t measured a same-hardware from-scratch baseline. Your first install depends on bandwidth, disk and how far the chain has moved since the snapshot.</p>
+        <p class="fine">One development run, including interruptions and fixes. Times vary with bandwidth, disk speed and snapshot age. No from-scratch comparison was measured.</p>
       </div>
-      <ul class="checks">
-        <li>Reached the live tip and served an actual compact block through gRPC.</li>
-        <li>Removed compressed archives and range files after restore.</li>
-        <li>Restarted, reused both databases with no new downloads, and came back <code>healthy</code>.</li>
-        <li>Served a client on another machine over a private Tailscale-bound port.</li>
-      </ul>
-    </article>
+    </div>
   </div>
 </section>
 
@@ -422,34 +331,6 @@ docker compose up -d --build</code></pre>
         <li class="no"><b>Native ARM64</b> — not supported.</li>
         <li class="warn"><b>Apple Silicon</b> — runs under amd64 emulation; a full mainnet restore has not passed validation there.</li>
       </ul>
-    </div>
-  </div>
-</section>
-
-<!-- ============ TRUST ============ -->
-<section class="trust" id="trust" aria-labelledby="trust-title">
-  <div class="wrap trust-grid">
-    <div>
-      <h2 id="trust-title" class="h2">The fine print, in large print.</h2>
-      <p class="sec-intro">Snapshots are a shortcut, and shortcuts have a shape. Here it is, so nobody has to find it in a footnote.</p>
-    </div>
-    <div class="trust-cols">
-      <div class="trust-col yes">
-        <h3>What a SHA-256 check buys you</h3>
-        <ul>
-          <li>Proof the archive you got is the archive the manifest described, byte for byte.</li>
-          <li>Protection against truncated, corrupted or tampered-in-transit downloads.</li>
-          <li>Your own node and wallet server afterwards: no remote RPC backend in your wallet’s path.</li>
-        </ul>
-      </div>
-      <div class="trust-col no">
-        <h3>What it doesn’t</h3>
-        <ul>
-          <li>Authentication. A publisher who can replace both the archive and its manifest can replace the checksum too.</li>
-          <li>From-genesis verification. Imported history is trusted to the snapshot publishers.</li>
-          <li>So: self-hosted, yes. “Trustless”, no. We’d rather you know.</li>
-        </ul>
-      </div>
     </div>
   </div>
 </section>
@@ -495,7 +376,7 @@ docker compose up -d --build</code></pre>
       </details>
       <details>
         <summary>Is this trustless?</summary>
-        <p>No. Checksums protect integrity, not authenticity, and imported history depends on the snapshot publishers. What you do get is your own node and wallet server, with no third-party RPC in the path from here on. See <a href="#trust">the fine print</a>.</p>
+        <p>No. Checksums protect integrity, not authenticity, and imported history depends on the snapshot publishers. What you do get is your own node and wallet server, with no third-party RPC in the path from here on. See the <a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#trust-and-validation-boundary">deployment guide</a>.</p>
       </details>
     </div>
   </div>
