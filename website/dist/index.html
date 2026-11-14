@@ -179,11 +179,68 @@ docker compose up -d --build</code></pre>
   </div>
 </section>
 
+<!-- ============ PERFORMANCE ============ -->
+<section class="evidence" id="evidence" aria-labelledby="ev-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="ev-title" class="h2">Performance</h2>
+      <p class="sec-intro">Mainnet startup on <time datetime="2026-11-14">14 November 2026</time>, using a Linux amd64 VPS with 12 CPU threads, 32 GiB RAM and a 1 TB SSD.</p>
+    </div>
+    <div class="performance-card">
+      <dl class="performance-grid">
+        <div><dt>First startup</dt><dd>≈99 min</dd></div>
+        <div><dt>Zakura snapshot download</dt><dd>≈275 GB</dd></div>
+        <div><dt>lightwalletd snapshot download</dt><dd>≈24.6 GB</dd></div>
+      </dl>
+      <div class="timeline">
+        <p class="tl-title">Startup breakdown</p>
+        <div class="tl-bar" role="img" aria-label="About 86 minutes downloading, verifying and restoring snapshots. The remaining time included setup, development interruptions and fixes. Zakura caught up in about 40 seconds after restore.">
+          <span class="tl-seg dl" style="--w:86.9%"></span>
+          <span class="tl-seg rest" style="--w:12.4%"></span>
+          <span class="tl-seg tip" style="--w:0.7%"></span>
+        </div>
+        <ul class="tl-key">
+          <li><i class="k dl" aria-hidden="true"></i>Download, verify &amp; restore: ≈86 min</li>
+          <li><i class="k rest" aria-hidden="true"></i>Other setup and interruptions</li>
+          <li><i class="k tip" aria-hidden="true"></i>Zakura catch-up: ≈40 sec</li>
+        </ul>
+        <p class="fine">One development run, including interruptions and fixes. Times vary with bandwidth, disk speed and snapshot age. No from-scratch comparison was measured.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REQUIREMENTS ============ -->
+<section class="reqs" aria-labelledby="req-title">
+  <div class="wrap reqs-grid">
+    <div>
+      <h2 id="req-title" class="h2">Bring a real machine.</h2>
+      <p class="sec-intro">This is an archive node, not a toy. First boot moves about <strong>300 GB compressed</strong> (≈275 GB Zakura + ≈25 GB lightwalletd), then verifies and extracts it, so plan the disk accordingly.</p>
+      <p class="sec-intro">On a fast SSD host with good bandwidth, expect the first end-to-end install to take <strong>roughly 2–3 hours</strong>. Slower links and disks take longer. Later starts reuse the data.</p>
+    </div>
+    <div class="plate" role="group" aria-label="Recommended hardware">
+      <div class="plate-head"><span>Recommended</span><span class="rivets" aria-hidden="true"><i></i><i></i></span></div>
+      <dl class="plate-grid">
+        <div><dt>CPU</dt><dd>4 cores</dd></div>
+        <div><dt>Memory</dt><dd>16 GiB</dd></div>
+        <div><dt>Storage</dt><dd>SSD</dd></div>
+        <div><dt>Data capacity</dt><dd>1 TB</dd></div>
+      </dl>
+      <ul class="compat">
+        <li class="ok"><b>Linux amd64</b> — tested platform.</li>
+        <li class="ok"><b>Docker Desktop / WSL 2</b> — allocate these resources to Docker’s VM, not just the host.</li>
+        <li class="no"><b>Native ARM64</b> — not supported.</li>
+        <li class="warn"><b>Apple Silicon</b> — runs under amd64 emulation; a full mainnet restore has not passed validation there.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 <!-- ============ INSIDE ============ -->
 <section class="inside" id="inside" aria-labelledby="inside-title">
   <div class="wrap">
     <div class="sec-head on-dark">
-      <h2 id="inside-title" class="h2">Inside the box.</h2>
+      <h2 id="inside-title" class="h2">Inside the container</h2>
       <p class="sec-intro">One process tree, two daemons, one volume, three ports, and a clear opinion about which of them the internet gets to see.</p>
     </div>
     <div class="inside-grid">
@@ -274,63 +331,6 @@ docker compose up -d --build</code></pre>
         <li data-part="p2p"><span class="lg-n">6</span><div><h3>Peer port 8233</h3><p>The one port meant for the internet: the node’s connection to other Zcash peers.</p></div></li>
         <li data-part="grpc"><span class="lg-n">7</span><div><h3>Wallet port 9067</h3><p>lightwalletd gRPC, bound to your host’s loopback by default. Serving another machine is a deliberate choice: an SSH tunnel, a private network, or your own TLS certificate.</p></div></li>
       </ol>
-    </div>
-  </div>
-</section>
-
-<!-- ============ PERFORMANCE ============ -->
-<section class="evidence" id="evidence" aria-labelledby="ev-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 id="ev-title" class="h2">Performance</h2>
-      <p class="sec-intro">Mainnet startup on <time datetime="2026-11-14">14 November 2026</time>, using a Linux amd64 VPS with 12 CPU threads, 32 GiB RAM and a 1 TB SSD.</p>
-    </div>
-    <div class="performance-card">
-      <dl class="performance-grid">
-        <div><dt>First startup</dt><dd>≈99 min</dd></div>
-        <div><dt>Zakura snapshot download</dt><dd>≈275 GB</dd></div>
-        <div><dt>lightwalletd snapshot download</dt><dd>≈24.6 GB</dd></div>
-      </dl>
-      <div class="timeline">
-        <p class="tl-title">Startup breakdown</p>
-        <div class="tl-bar" role="img" aria-label="About 86 minutes downloading, verifying and restoring snapshots. The remaining time included setup, development interruptions and fixes. Zakura caught up in about 40 seconds after restore.">
-          <span class="tl-seg dl" style="--w:86.9%"></span>
-          <span class="tl-seg rest" style="--w:12.4%"></span>
-          <span class="tl-seg tip" style="--w:0.7%"></span>
-        </div>
-        <ul class="tl-key">
-          <li><i class="k dl" aria-hidden="true"></i>Download, verify &amp; restore: ≈86 min</li>
-          <li><i class="k rest" aria-hidden="true"></i>Other setup and interruptions</li>
-          <li><i class="k tip" aria-hidden="true"></i>Zakura catch-up: ≈40 sec</li>
-        </ul>
-        <p class="fine">One development run, including interruptions and fixes. Times vary with bandwidth, disk speed and snapshot age. No from-scratch comparison was measured.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ REQUIREMENTS ============ -->
-<section class="reqs" aria-labelledby="req-title">
-  <div class="wrap reqs-grid">
-    <div>
-      <h2 id="req-title" class="h2">Bring a real machine.</h2>
-      <p class="sec-intro">This is an archive node, not a toy. First boot moves about <strong>300 GB compressed</strong> (≈275 GB Zakura + ≈25 GB lightwalletd), then verifies and extracts it, so plan the disk accordingly.</p>
-      <p class="sec-intro">On a fast SSD host with good bandwidth, expect the first end-to-end install to take <strong>roughly 2–3 hours</strong>. Slower links and disks take longer. Later starts reuse the data.</p>
-    </div>
-    <div class="plate" role="group" aria-label="Recommended hardware">
-      <div class="plate-head"><span>Recommended</span><span class="rivets" aria-hidden="true"><i></i><i></i></span></div>
-      <dl class="plate-grid">
-        <div><dt>CPU</dt><dd>4 cores</dd></div>
-        <div><dt>Memory</dt><dd>16 GiB</dd></div>
-        <div><dt>Storage</dt><dd>SSD</dd></div>
-        <div><dt>Data capacity</dt><dd>1 TB</dd></div>
-      </dl>
-      <ul class="compat">
-        <li class="ok"><b>Linux amd64</b> — tested platform.</li>
-        <li class="ok"><b>Docker Desktop / WSL 2</b> — allocate these resources to Docker’s VM, not just the host.</li>
-        <li class="no"><b>Native ARM64</b> — not supported.</li>
-        <li class="warn"><b>Apple Silicon</b> — runs under amd64 emulation; a full mainnet restore has not passed validation there.</li>
-      </ul>
     </div>
   </div>
 </section>
