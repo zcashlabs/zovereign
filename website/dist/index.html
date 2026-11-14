@@ -214,23 +214,23 @@ docker compose up -d --build</code></pre>
 <section class="reqs" aria-labelledby="req-title">
   <div class="wrap reqs-grid">
     <div>
-      <h2 id="req-title" class="h2">Bring a real machine.</h2>
-      <p class="sec-intro">This is an archive node, not a toy. First boot moves about <strong>300 GB compressed</strong> (≈275 GB Zakura + ≈25 GB lightwalletd), then verifies and extracts it, so plan the disk accordingly.</p>
-      <p class="sec-intro">On a fast SSD host with good bandwidth, expect the first end-to-end install to take <strong>roughly 2–3 hours</strong>. Slower links and disks take longer. Later starts reuse the data.</p>
+      <h2 id="req-title" class="h2">Machine recommendation</h2>
+      <p class="sec-intro">Use a computer or server with <strong>4 CPU cores, 16 GiB of RAM and a 1 TB SSD</strong>. The first setup downloads about <strong>300 GB</strong> and needs extra disk space to unpack the snapshots.</p>
+      <p class="sec-intro">Allow around <strong>2–3 hours</strong> for the first setup with a fast internet connection and SSD. Slower connections or disks take longer. Future starts use the saved data.</p>
     </div>
     <div class="plate" role="group" aria-label="Recommended hardware">
       <div class="plate-head"><span>Recommended</span><span class="rivets" aria-hidden="true"><i></i><i></i></span></div>
       <dl class="plate-grid">
         <div><dt>CPU</dt><dd>4 cores</dd></div>
         <div><dt>Memory</dt><dd>16 GiB</dd></div>
-        <div><dt>Storage</dt><dd>SSD</dd></div>
-        <div><dt>Data capacity</dt><dd>1 TB</dd></div>
+        <div><dt>Disk type</dt><dd>SSD</dd></div>
+        <div><dt>Disk space</dt><dd>1 TB</dd></div>
       </dl>
       <ul class="compat">
-        <li class="ok"><b>Linux amd64</b> — tested platform.</li>
-        <li class="ok"><b>Docker Desktop / WSL 2</b> — allocate these resources to Docker’s VM, not just the host.</li>
+        <li class="ok"><b>Linux amd64</b> — supported and tested.</li>
+        <li class="ok"><b>Docker Desktop / WSL 2</b> — give Docker the CPU, memory and disk space listed above.</li>
         <li class="no"><b>Native ARM64</b> — not supported.</li>
-        <li class="warn"><b>Apple Silicon</b> — runs under amd64 emulation; a full mainnet restore has not passed validation there.</li>
+        <li class="warn"><b>Apple Silicon</b> — requires amd64 emulation. A full setup has not been tested on these Macs.</li>
       </ul>
     </div>
   </div>
