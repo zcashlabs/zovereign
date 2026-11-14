@@ -355,37 +355,6 @@ docker compose up -d --build</code></pre>
   </div>
 </section>
 
-<!-- ============ WHY ============ -->
-<section class="why" aria-labelledby="why-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 id="why-title" class="h2">Why it’s worth the disk.</h2>
-    </div>
-    <div class="why-grid">
-      <article class="why-item">
-        <p class="why-n" aria-hidden="true">i.</p>
-        <h3>You skip the slowest part on purpose.</h3>
-        <p>An archive node’s history is the expensive bit. Zovereign downloads it as a verified snapshot instead of replaying it from the network, then lets your node do the live work. The win is not a magic number. It is not doing the historical rebuild at all.</p>
-      </article>
-      <article class="why-item">
-        <p class="why-n" aria-hidden="true">ii.</p>
-        <h3>The whole stack, not just a node.</h3>
-        <p>A node without lightwalletd can’t serve a light wallet. lightwalletd without a node needs someone else’s RPC. You get both, started in the right order, configured against each other, and watched as one unit.</p>
-      </article>
-      <article class="why-item">
-        <p class="why-n" aria-hidden="true">iii.</p>
-        <h3>Failure is a planned state.</h3>
-        <p>Downloads resume. Corrupt archives get rejected. Extraction errors clean up their own staging. An incompatible database is refused instead of silently replaced. Installed data is never overwritten by a bootstrap that doesn’t recognise it.</p>
-      </article>
-      <article class="why-item">
-        <p class="why-n" aria-hidden="true">iv.</p>
-        <h3>Private until you say otherwise.</h3>
-        <p>RPC stays inside the container. Wallet gRPC is on host loopback. Daemons run unprivileged. Opening it to the world is something you do on purpose, with a tunnel or TLS, not something you discover in your logs.</p>
-      </article>
-    </div>
-  </div>
-</section>
-
 <!-- ============ EVIDENCE ============ -->
 <section class="evidence" id="evidence" aria-labelledby="ev-title">
   <div class="wrap">

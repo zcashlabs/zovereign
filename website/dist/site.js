@@ -134,11 +134,11 @@
   }
 
   /* ---- reveal on scroll (purely decorative; content is visible without JS) ---- */
-  var revealTargets = document.querySelectorAll('.timeline, .step, .why-item, .report, .trust-col, .plate');
+  var revealTargets = document.querySelectorAll('.timeline, .step, .report, .trust-col, .plate');
   if (!('IntersectionObserver' in window) || reduceMotion) {
     revealTargets.forEach(function (el) { el.classList.add('in'); });
   } else {
-    document.querySelectorAll('.step, .why-item, .report, .trust-col, .plate').forEach(function (el) { el.classList.add('reveal'); });
+    document.querySelectorAll('.step, .report, .trust-col, .plate').forEach(function (el) { el.classList.add('reveal'); });
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }

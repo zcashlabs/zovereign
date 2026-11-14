@@ -261,15 +261,6 @@ strong { font-weight: 650; }
 .legend p { margin: 0; font-size: .95rem; color: var(--ivory-dim); }
 .legend code, .install code, .closer code { background: rgba(242,236,223,.1); color: var(--paper); }
 
-/* ---------- why ---------- */
-.why { padding: var(--sec-y) 0; }
-.why-grid { display: grid; grid-template-columns: 1fr; border-top: 1.5px solid var(--ink); }
-@media (min-width: 820px) { .why-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .why-item:nth-child(odd) { border-right: 1px solid var(--rule); padding-right: 48px; } .why-item:nth-child(even) { padding-left: 48px; } }
-.why-item { padding: 36px 0; border-bottom: 1px solid var(--rule); }
-.why-n { font: italic 500 2.6rem/1 var(--f-display); color: var(--gold-d); margin: 0 0 14px; }
-.why-item h3 { font: 650 clamp(1.4rem, 2.4vw, 1.85rem)/1.12 var(--f-display); letter-spacing: -.015em; margin: 0 0 12px; max-width: 20ch; }
-.why-item p { margin: 0; color: var(--ink-2); max-width: 36em; }
-
 /* ---------- evidence ---------- */
 .evidence { padding: var(--sec-y) 0; background: var(--paper-2); border-top: 1.5px solid var(--ink); }
 .report { background: #fbf8f0; border: 1.5px solid var(--ink); border-radius: 6px; box-shadow: 10px 10px 0 var(--ink); padding: clamp(20px, 4vw, 48px); position: relative;
