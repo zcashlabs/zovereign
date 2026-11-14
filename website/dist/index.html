@@ -100,11 +100,87 @@
   </div>
 </section>
 
+<!-- ============ INSTALL ============ -->
+<section class="install" id="install" aria-labelledby="install-title">
+  <div class="wrap">
+    <div class="sec-head on-dark">
+      <p class="sec-no">§ 01</p>
+      <h2 id="install-title" class="h2">Start it.</h2>
+      <p class="sec-intro">No registry login, separate RPC provider, Docker-in-Docker or RPC credentials. Pick one way to run it. Both create the same <code>zovereign</code> container and <code>zovereign-data</code> volume.</p>
+    </div>
+
+    <div class="tabs" data-tabs>
+      <div class="tablist" role="tablist" aria-label="Install method" hidden>
+        <button role="tab" id="tab-run" aria-controls="panel-run" aria-selected="true">Published image</button>
+        <button role="tab" id="tab-compose" aria-controls="panel-compose" aria-selected="false">Build with Compose</button>
+      </div>
+
+      <div class="panel" id="panel-run" role="tabpanel" aria-labelledby="tab-run">
+        <h3 class="panel-h">Published image <span>· nothing to clone</span></h3>
+        <div class="code">
+          <div class="code-bar"><span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="code-name">shell</span><button class="copy" type="button" data-copy="cmd-run" hidden><span class="copy-label">Copy</span></button></div>
+<pre id="cmd-run"><code>docker run -d --platform linux/amd64 \
+  --name zovereign --restart unless-stopped --stop-timeout 120 \
+  --log-driver json-file --log-opt max-size=20m --log-opt max-file=3 \
+  --mount type=volume,src=zovereign-data,dst=/data \
+  -p 8233:8233 -p 127.0.0.1:9067:9067 \
+  ghcr.io/zcashlabs/zovereign:latest</code></pre>
+        </div>
+        <ul class="flag-notes">
+          <li><code>--mount …zovereign-data</code> keeps databases and download progress across container replacement.</li>
+          <li><code>127.0.0.1:9067</code> publishes wallet gRPC to your machine only.</li>
+          <li><code>--stop-timeout 120</code> gives both databases time to flush on stop.</li>
+        </ul>
+      </div>
+
+      <div class="panel" id="panel-compose" role="tabpanel" aria-labelledby="tab-compose">
+        <h3 class="panel-h">From source <span>· build locally with Compose</span></h3>
+        <div class="code">
+          <div class="code-bar"><span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="code-name">shell</span><button class="copy" type="button" data-copy="cmd-compose" hidden><span class="copy-label">Copy</span></button></div>
+<pre id="cmd-compose"><code>git clone https://github.com/zcashlabs/zovereign.git
+cd zovereign
+docker compose up -d --build</code></pre>
+        </div>
+        <ul class="flag-notes">
+          <li>Same defaults: bounded logs, two-minute shutdown grace, loopback gRPC, persistent volume.</li>
+          <li>Optional: copy <code>.env.example</code> to <code>.env</code> to change ports, download concurrency or disk reserve.</li>
+          <li>Pause with <code>docker compose stop</code>; resume with <code>docker compose start</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="after">
+      <div class="after-step">
+        <p class="step-no">Then · watch it work</p>
+        <div class="code sm">
+          <div class="code-bar"><span class="code-name">logs</span><button class="copy" type="button" data-copy="cmd-logs" hidden><span class="copy-label">Copy</span></button></div>
+<pre id="cmd-logs"><code>docker logs -f --tail=100 zovereign</code></pre>
+        </div>
+      </div>
+      <div class="after-step">
+        <p class="step-no">Then · ask if it’s ready</p>
+        <div class="code sm">
+          <div class="code-bar"><span class="code-name">health</span><button class="copy" type="button" data-copy="cmd-health" hidden><span class="copy-label">Copy</span></button></div>
+<pre id="cmd-health"><code>docker inspect --format '{{.State.Health.Status}}' zovereign</code></pre>
+        </div>
+        <p class="after-note"><code>starting</code> during bootstrap. <code>healthy</code> once the node is near tip and a real compact block came back.</p>
+      </div>
+      <div class="after-step">
+        <p class="step-no">Then · point a wallet at it</p>
+        <p class="endpoint"><code>127.0.0.1:9067</code></p>
+        <p class="after-note">Any wallet or gRPC client that supports a custom plaintext server. For other machines, use a trusted tunnel or <a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#serving-remote-clients-with-tls">configure TLS</a>.</p>
+      </div>
+    </div>
+    <p class="keep"><strong>Keep the volume.</strong> Stop gracefully with <code>docker stop -t 120 zovereign</code>. Removing or replacing the container keeps <code>zovereign-data</code>; deleting the volume means downloading ~300 GB again.</p>
+    <p class="docs-cta"><a class="btn btn-gold" href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md">Read the deployment guide <span aria-hidden="true">→</span></a> <span>Updating, storage, recovery, configuration and TLS.</span></p>
+  </div>
+</section>
+
 <!-- ============ LEDGER ============ -->
 <section class="ledger-sec" aria-labelledby="ledger-title">
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-no">§ 01</p>
+      <p class="sec-no">§ 02</p>
       <h2 id="ledger-title" class="h2">Things you can stop doing.</h2>
       <p class="sec-intro">Running Zcash wallet infrastructure used to mean a weekend of glue. Zovereign does the glue, and does it the same way every time.</p>
     </div>
@@ -122,7 +198,7 @@
 <section class="how" id="how" aria-labelledby="how-title">
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-no">§ 02</p>
+      <p class="sec-no">§ 03</p>
       <h2 id="how-title" class="h2">From two crates of history to a block in your wallet.</h2>
       <p class="sec-intro">On first boot, Zovereign turns about 300 GB of compressed snapshots into a running node and wallet server. Every step is checked, resumable and boring in the best way. Here is the actual sequence.</p>
     </div>
@@ -200,7 +276,7 @@
 <section class="inside" id="inside" aria-labelledby="inside-title">
   <div class="wrap">
     <div class="sec-head on-dark">
-      <p class="sec-no">§ 03</p>
+      <p class="sec-no">§ 04</p>
       <h2 id="inside-title" class="h2">Inside the box.</h2>
       <p class="sec-intro">One process tree, two daemons, one volume, three ports, and a clear opinion about which of them the internet gets to see.</p>
     </div>
@@ -300,7 +376,7 @@
 <section class="why" aria-labelledby="why-title">
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-no">§ 04</p>
+      <p class="sec-no">§ 05</p>
       <h2 id="why-title" class="h2">Why it’s worth the disk.</h2>
     </div>
     <div class="why-grid">
@@ -332,7 +408,7 @@
 <section class="evidence" id="evidence" aria-labelledby="ev-title">
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-no">§ 05</p>
+      <p class="sec-no">§ 06</p>
       <h2 id="ev-title" class="h2">Field test, written down.</h2>
       <p class="sec-intro">We ran the full thing against real mainnet snapshots on a clean Linux amd64 VPS (12 CPU threads, 32 GiB RAM, 1 TB SSD). These are dated results from that run, not a live counter.</p>
     </div>
@@ -378,7 +454,7 @@
 <section class="reqs" aria-labelledby="req-title">
   <div class="wrap reqs-grid">
     <div>
-      <p class="sec-no">§ 06</p>
+      <p class="sec-no">§ 07</p>
       <h2 id="req-title" class="h2">Bring a real machine.</h2>
       <p class="sec-intro">This is an archive node, not a toy. First boot moves about <strong>300 GB compressed</strong> (≈275 GB Zakura + ≈25 GB lightwalletd), then verifies and extracts it, so plan the disk accordingly.</p>
       <p class="sec-intro">On a fast SSD host with good bandwidth, expect the first end-to-end install to take <strong>roughly 2–3 hours</strong>. Slower links and disks take longer. Later starts reuse the data.</p>
@@ -398,82 +474,6 @@
         <li class="warn"><b>Apple Silicon</b> — runs under amd64 emulation; a full mainnet restore has not passed validation there.</li>
       </ul>
     </div>
-  </div>
-</section>
-
-<!-- ============ INSTALL ============ -->
-<section class="install" id="install" aria-labelledby="install-title">
-  <div class="wrap">
-    <div class="sec-head on-dark">
-      <p class="sec-no">§ 07</p>
-      <h2 id="install-title" class="h2">Start it.</h2>
-      <p class="sec-intro">No registry login, separate RPC provider, Docker-in-Docker or RPC credentials. Pick one way to run it. Both create the same <code>zovereign</code> container and <code>zovereign-data</code> volume.</p>
-    </div>
-
-    <div class="tabs" data-tabs>
-      <div class="tablist" role="tablist" aria-label="Install method" hidden>
-        <button role="tab" id="tab-run" aria-controls="panel-run" aria-selected="true">Published image</button>
-        <button role="tab" id="tab-compose" aria-controls="panel-compose" aria-selected="false">Build with Compose</button>
-      </div>
-
-      <div class="panel" id="panel-run" role="tabpanel" aria-labelledby="tab-run">
-        <h3 class="panel-h">Published image <span>· nothing to clone</span></h3>
-        <div class="code">
-          <div class="code-bar"><span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="code-name">shell</span><button class="copy" type="button" data-copy="cmd-run" hidden><span class="copy-label">Copy</span></button></div>
-<pre id="cmd-run"><code>docker run -d --platform linux/amd64 \
-  --name zovereign --restart unless-stopped --stop-timeout 120 \
-  --log-driver json-file --log-opt max-size=20m --log-opt max-file=3 \
-  --mount type=volume,src=zovereign-data,dst=/data \
-  -p 8233:8233 -p 127.0.0.1:9067:9067 \
-  ghcr.io/zcashlabs/zovereign:latest</code></pre>
-        </div>
-        <ul class="flag-notes">
-          <li><code>--mount …zovereign-data</code> keeps databases and download progress across container replacement.</li>
-          <li><code>127.0.0.1:9067</code> publishes wallet gRPC to your machine only.</li>
-          <li><code>--stop-timeout 120</code> gives both databases time to flush on stop.</li>
-        </ul>
-      </div>
-
-      <div class="panel" id="panel-compose" role="tabpanel" aria-labelledby="tab-compose">
-        <h3 class="panel-h">From source <span>· build locally with Compose</span></h3>
-        <div class="code">
-          <div class="code-bar"><span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="code-name">shell</span><button class="copy" type="button" data-copy="cmd-compose" hidden><span class="copy-label">Copy</span></button></div>
-<pre id="cmd-compose"><code>git clone https://github.com/zcashlabs/zovereign.git
-cd zovereign
-docker compose up -d --build</code></pre>
-        </div>
-        <ul class="flag-notes">
-          <li>Same defaults: bounded logs, two-minute shutdown grace, loopback gRPC, persistent volume.</li>
-          <li>Optional: copy <code>.env.example</code> to <code>.env</code> to change ports, download concurrency or disk reserve.</li>
-          <li>Pause with <code>docker compose stop</code>; resume with <code>docker compose start</code>.</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="after">
-      <div class="after-step">
-        <p class="step-no">Then · watch it work</p>
-        <div class="code sm">
-          <div class="code-bar"><span class="code-name">logs</span><button class="copy" type="button" data-copy="cmd-logs" hidden><span class="copy-label">Copy</span></button></div>
-<pre id="cmd-logs"><code>docker logs -f --tail=100 zovereign</code></pre>
-        </div>
-      </div>
-      <div class="after-step">
-        <p class="step-no">Then · ask if it’s ready</p>
-        <div class="code sm">
-          <div class="code-bar"><span class="code-name">health</span><button class="copy" type="button" data-copy="cmd-health" hidden><span class="copy-label">Copy</span></button></div>
-<pre id="cmd-health"><code>docker inspect --format '{{.State.Health.Status}}' zovereign</code></pre>
-        </div>
-        <p class="after-note"><code>starting</code> during bootstrap. <code>healthy</code> once the node is near tip and a real compact block came back.</p>
-      </div>
-      <div class="after-step">
-        <p class="step-no">Then · point a wallet at it</p>
-        <p class="endpoint"><code>127.0.0.1:9067</code></p>
-        <p class="after-note">Any wallet or gRPC client that supports a custom plaintext server. For other machines, use a trusted tunnel or <a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#serving-remote-clients-with-tls">configure TLS</a>.</p>
-      </div>
-    </div>
-    <p class="keep"><strong>Keep the volume.</strong> Stop gracefully with <code>docker stop -t 120 zovereign</code>. Removing or replacing the container keeps <code>zovereign-data</code>; deleting the volume means downloading ~300 GB again.</p>
-    <p class="docs-cta"><a class="btn btn-gold" href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md">Read the deployment guide <span aria-hidden="true">→</span></a> <span>Updating, storage, recovery, configuration and TLS.</span></p>
   </div>
 </section>
 
