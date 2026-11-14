@@ -1,0 +1,61 @@
+name: Build and test native Nix runtime
+
+on:
+  push:
+    paths:
+      - flake.nix
+      - flake.lock
+      - nix/**
+      - docker/stack.py
+      - tests/**
+      - .github/workflows/nix-test.yml
+  pull_request:
+    paths:
+      - flake.nix
+      - flake.lock
+      - nix/**
+      - docker/stack.py
+      - tests/**
+      - .github/workflows/nix-test.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Native (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-24.04
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+          - system: x86_64-darwin
+            runner: macos-15-intel
+          - system: aarch64-darwin
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - uses: DeterminateSystems/nix-installer-action@v21
+        with:
+          extra-conf: |
+            max-jobs = 1
+            cores = 2
+      - name: Check flake and build native runtime
+        env:
+          EXPECTED_SYSTEM: ${{ matrix.system }}
+        run: |
+          test "$(nix eval --impure --raw --expr builtins.currentSystem)" = "$EXPECTED_SYSTEM"
+          nix flake check --no-update-lock-file -L
+          nix run . -- --help
+      - name: Run localhost fixtures and real-binary regressions
+        run: nix run .#test

@@ -19,6 +19,10 @@ CONTRIBUTING.md, and docs/single-container.md first.
 - `.github/workflows/release.yml`: manual versioned release on main; reuses
   the full container pipeline, tags the image, and creates a GitHub Release.
 - `compose.yaml` and `.env.example`: local user startup defaults.
+- `flake.nix`, `flake.lock`, and `nix/`: native Linux/macOS packages and the
+  foreground launcher. Intel macOS uses a separate supported Nixpkgs input.
+- `.github/workflows/nix-test.yml` and `tests/test_native.py`: four-platform
+  native builds and regressions, separate from container publication.
 - `tests/test_stack.py`: fixture and real-binary regressions; no mainnet download.
 - `tests/accept_mainnet.py`: opt-in acceptance for an existing real deployment.
 - `website/dist/`: buildless landing page, styles, JavaScript, and illustrations.
@@ -49,6 +53,10 @@ command needs no production volume. Avoid downloading mainnet snapshots unless
 the task requires integration validation. Do not claim a real restore passed
 when only fixtures ran. CI builds, tests, and publishes on relevant main pushes.
 
+For native Nix changes, run `nix flake check` and `nix run .#test` as an ordinary
+user. The test app uses temporary localhost fixtures, not deployment data.
+Native full-mainnet acceptance is pending on all four supported platforms.
+
 ## Runtime invariants
 
 - Preserve persistent data. Never delete a deployment volume, run `down -v`,
@@ -61,7 +69,8 @@ when only fixtures ran. CI builds, tests, and publishes on relevant main pushes.
 - Reject incompatible network, database major, or lightwalletd version. Reject
   unsafe tar paths, links, and special files. Install only validated staging
   directories and refuse to overwrite unrecognized existing data.
-- Bootstrap and both daemons run as UID/GID 10001. Zakura consumes `ZAKURA_*`
+- In Docker, bootstrap and both daemons run as UID/GID 10001. Native Nix runs
+  use the invoking non-root user. Zakura consumes `ZAKURA_*`
   as native config: filter wrapper metadata from its child environment while
   retaining supported `ZAKURA_SECTION__KEY` settings and mandatory overrides.
 - lightwalletd reopens `/dev/stdout`; preserve the pipe created after privilege

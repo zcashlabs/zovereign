@@ -43,6 +43,26 @@ container to prove database reuse. It can take hours and download hundreds of
 gigabytes. Acceptance reports can contain deployment details; keep them out
 of commits unless reviewed and sanitized.
 
+## Native Nix builds and tests
+
+On Linux or macOS (x86_64 or ARM64), as an ordinary user with flakes enabled:
+
+```bash
+nix flake check -L
+nix run .#test
+```
+
+[Native CI](.github/workflows/nix-test.yml) runs these checks on all four
+platforms, separately from container publication. Tests use temporary localhost
+fixtures and real binaries, without mainnet downloads or deployment data.
+Native full-mainnet acceptance remains pending. Run the container regressions
+when changing the shared supervisor.
+
+Build individual daemons with `nix build .#zakura` or `nix build .#lightwalletd`.
+Sources and dependencies are pinned; Intel macOS uses a separate Nixpkgs 26.05
+input with Rust 1.98. Keep source closures limited to the launcher, supervisor,
+and test files.
+
 ## Continuous integration and image publication
 
 [The container workflow](.github/workflows/container-test.yml) validates

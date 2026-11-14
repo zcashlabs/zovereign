@@ -36,6 +36,35 @@ CI builds and runs fixture and bundled-binary tests on both architectures.
 A complete mainnet restore has been verified on Linux amd64; full-mainnet
 validation on ARM64 and Docker Desktop is still pending.
 
+## Run natively with Nix
+
+With [Nix](https://nixos.org/download/) and flakes enabled, run on Linux or
+macOS (x86_64 or ARM64) as your ordinary user:
+
+```bash
+git clone https://github.com/zcashlabs/zovereign.git
+cd zovereign
+nix run .
+```
+
+The first build can take a while. The resource requirements above and
+[snapshot trust boundary](docs/single-container.md#trust-and-validation-boundary)
+also apply. Native full-mainnet acceptance is pending on all four platforms.
+
+Logs stream to the terminal; Ctrl-C stops both services and preserves data.
+Run `nix run .` again to resume, `nix run . -- health` to check readiness, or
+`nix run . -- --help` for options. Update with `git pull --ff-only` while stopped.
+
+Data defaults to `${XDG_DATA_HOME:-$HOME/.local/share}/zovereign` on Linux or
+`~/Library/Application Support/zovereign` on macOS. Override it with `DATA_DIR`
+and use the same directory on subsequent runs.
+
+Export [configuration](docs/single-container.md#configuration) in your shell;
+`.env` is not read. gRPC defaults to `127.0.0.1:9067`; `GRPC_BIND_ADDR` accepts
+a loopback or wildcard host and port. For remote clients, use a trusted tunnel
+or set both `TLS_CERT` and `TLS_KEY` before binding publicly. Use the same data
+directory and gRPC/TLS settings for health checks.
+
 ## Run the published image directly
 
 Without cloning the repository or building an image, run:
