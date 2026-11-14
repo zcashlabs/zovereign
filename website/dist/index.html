@@ -374,10 +374,6 @@ docker compose up -d --build</code></pre>
         <summary>How do I update without losing anything?</summary>
         <p>Pull the new image, stop with a 120-second grace period, remove the container, and run the same command again with the same <code>zovereign-data</code> volume. The databases stay put. Check release notes first: an incompatible database is refused, not silently replaced. Pin a <code>sha-&lt;commit&gt;</code> tag or digest when you want controlled upgrades.</p>
       </details>
-      <details>
-        <summary>Is this trustless?</summary>
-        <p>No. Checksums protect integrity, not authenticity, and imported history depends on the snapshot publishers. What you do get is your own node and wallet server, with no third-party RPC in the path from here on. See the <a href="https://github.com/zcashlabs/zovereign/blob/main/docs/single-container.md#trust-and-validation-boundary">deployment guide</a>.</p>
-      </details>
     </div>
   </div>
 </section>
