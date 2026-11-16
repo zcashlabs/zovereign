@@ -59,7 +59,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --locked
       - run: docker info
-      - name: Test real containers, persistence and monitor environments
+      - name: Test real containers, volumes, updates and rollback
         run: python3 tests/test_cli_docker.py -v
         env:
           ZOVEREIGN_DOCKER_INTEGRATION: '1'

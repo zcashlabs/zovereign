@@ -50,6 +50,9 @@ class Workflows(unittest.TestCase):
         s=self.state();s['arch']='aarch64';s['free_bytes']=1024;self.save(s)
         self.cli('setup','--image','candidate','--yes',ok=False)
         self.assertFalse(any(c[0]=='create' for c in self.state()['calls']))
+    def test_update_preserves_intentional_stop(self):
+        self.cli('stop');self.cli('update','--image','candidate','--yes')
+        self.assertFalse(self.state()['containers']['replacement']['State']['Running'])
     def test_closed_stdout_pipe_exits_without_a_panic(self):
         read_fd, write_fd = os.pipe()
         os.close(read_fd)
@@ -73,10 +76,35 @@ class Workflows(unittest.TestCase):
         self.assertTrue(self.state()['containers']['original']['State']['Running'])
     def test_intentional_stop_is_not_undone_by_monitor(self):
         self.cli('stop')
-        self.cli('agent','--once')
+        self.cli('agent','--once','--no-update-check')
         self.cli('repair','--yes',ok=False)
         self.assertFalse(self.state()['containers']['original']['State']['Running'])
         self.cli('start');self.assertTrue(self.state()['containers']['original']['State']['Running'])
+    def test_incompatible_update_never_stops_runtime(self):
+        s=self.state();s['images']['candidate']['Config']['Env']=[x.replace('DB_MAJOR=30','DB_MAJOR=31') for x in ENV];self.save(s)
+        self.cli('update','--image','candidate','--yes',ok=False)
+        self.assertFalse(any(c[0]=='stop' for c in self.state()['calls']))
+    def test_local_image_check_and_update_do_not_pull(self):
+        self.cli('update','--check','--local-image','--image','candidate')
+        self.cli('update','--local-image','--image','candidate','--yes')
+        self.assertFalse(any(c[0]=='pull' for c in self.state()['calls']))
+        self.assertTrue(self.state()['containers']['replacement']['State']['Running'])
+    def test_update_retains_original_and_rollback_stops_replacement(self):
+        self.cli('update','--image','candidate','--yes')
+        s=self.state();self.assertFalse(s['containers']['original']['State']['Running']);self.assertTrue(s['containers']['replacement']['State']['Running'])
+        self.cli('update','--rollback','--yes')
+        s=self.state();self.assertTrue(s['containers']['original']['State']['Running']);self.assertFalse(s['containers']['replacement']['State']['Running'])
+        self.assertEqual(s['containers']['original']['Name'],'/zovereign')
+    def test_creation_failure_is_recoverable_from_journal(self):
+        s=self.state();s['fail_create']=True;self.save(s)
+        self.cli('update','--image','candidate','--yes',ok=False)
+        config=json.loads((self.root/'config/installation.json').read_text());self.assertEqual(config['pending']['stage'],'old_retained')
+        self.cli('repair','--action','rollback','--yes')
+        self.assertTrue(self.state()['containers']['original']['State']['Running'])
+    def test_accept_removes_only_retained_container(self):
+        self.cli('update','--image','candidate','--yes');self.cli('update','--accept','--yes')
+        self.assertEqual(list(self.state()['containers']),['replacement'])
+        self.assertFalse(any('volume' in c and 'rm' in c for c in self.state()['calls']))
     def test_startup_template_handles_spaces(self):
         r=self.cli('startup','render','--platform','linux');self.assertIn('agent',json.loads(r.stdout)['template'])
     def test_monitor_finds_docker_from_installer_environment_on_both_platforms(self):
@@ -94,7 +122,7 @@ class Workflows(unittest.TestCase):
                 environment = {'HOME': os.environ['HOME'], 'PATH': '',
                                'FAKE_DOCKER_STATE': str(self.path), **recorded}
                 result = subprocess.run([str(BINARY), '--config-dir', str(self.root / 'config'),
-                                         'agent', '--once'],
+                                         'agent', '--once', '--no-update-check'],
                                         env=environment, text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 report = json.loads((self.root / 'config/monitor.json').read_text())
@@ -162,7 +190,7 @@ class Workflows(unittest.TestCase):
     def test_monitor_identifies_missing_docker_executable_and_cause(self):
         missing = self.root / 'missing-docker'
         self.env['ZOVEREIGN_DOCKER'] = str(missing)
-        self.cli('agent', '--once')
+        self.cli('agent', '--once', '--no-update-check')
         report = json.loads((self.root / 'config/monitor.json').read_text())
         self.assertIn(str(missing), report['status']['error'])
         self.assertIn('os error 2', report['status']['error'])
@@ -188,5 +216,58 @@ class Workflows(unittest.TestCase):
         self.assertTrue(container['State']['Running'])
         self.assertEqual(container['Mounts'][0]['Name'], 'zovereign-data')
         self.assertFalse(any(call[:2] == ['volume', 'rm'] for call in self.state()['calls']))
+
+    def test_foundation_configuration_remains_usable_after_upgrade(self):
+        path = self.root / 'config/installation.json'
+        record = json.loads(path.read_text())
+        record.pop('pending', None)
+        record.pop('previous', None)
+        path.write_text(json.dumps(record))
+        self.assertEqual(json.loads(self.cli('status').stdout)['state'], 'running')
+        self.cli('stop')
+        self.cli('start')
+        self.assertTrue(self.state()['containers']['original']['State']['Running'])
+
+    def test_rollback_refuses_a_replacement_with_an_unrelated_volume(self):
+        self.cli('update', '--image', 'candidate', '--yes')
+        state = self.state()
+        state['containers']['replacement']['Mounts'][0]['Name'] = 'unrelated-data'
+        self.save(state)
+        before = len(state['calls'])
+        self.cli('update', '--rollback', '--yes', ok=False)
+        state = self.state()
+        self.assertTrue(state['containers']['replacement']['State']['Running'])
+        self.assertFalse(state['containers']['original']['State']['Running'])
+        self.assertFalse(any(call[0] in ('stop', 'start', 'rename', 'update', 'rm') for call in state['calls'][before:]))
+
+    def test_release_checks_respect_offline_mode_and_cache_known_comparisons(self):
+        tools = self.root / 'release-tools'
+        tools.mkdir()
+        response = self.root / 'release-response.json'
+        calls = self.root / 'release-calls.txt'
+        curl = tools / 'curl'
+        curl.write_text('#!/usr/bin/env python3\nimport os\nfrom pathlib import Path\nwith Path(os.environ["FAKE_RELEASE_CALLS"]).open("a") as log: log.write("call\\n")\nprint(Path(os.environ["FAKE_RELEASE_RESPONSE"]).read_text())\n')
+        curl.chmod(0o755)
+        self.env.update(PATH=str(tools) + os.pathsep + self.env['PATH'],
+                        FAKE_RELEASE_RESPONSE=str(response), FAKE_RELEASE_CALLS=str(calls))
+        state = self.state()
+        state['images']['sha256:old']['Config']['Labels'] = {'org.opencontainers.image.revision': 'a' * 40}
+        self.save(state)
+        self.cli('agent', '--once', '--no-update-check')
+        self.assertFalse(calls.exists())
+        cache = self.root / 'config/release.json'
+        for target, known in (('b' * 40, True), ('main', False)):
+            with self.subTest(target=target):
+                cache.unlink(missing_ok=True)
+                response.write_text(json.dumps({'tag_name': 'v0.2.0', 'target_commitish': target,
+                                               'html_url': 'https://github.com/zcashlabs/zovereign/releases/tag/v0.2.0'}))
+                before = calls.read_text().count('call') if calls.exists() else 0
+                self.cli('agent', '--once')
+                report = json.loads(cache.read_text())
+                self.assertEqual(report['comparison_known'], known)
+                self.assertEqual(report['available'], known)
+                self.cli('agent', '--once')
+                self.assertEqual(calls.read_text().count('call'), before + 1)
+        self.assertTrue(self.state()['containers']['original']['State']['Running'])
 
 if __name__=='__main__':unittest.main()

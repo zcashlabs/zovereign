@@ -9,7 +9,8 @@ use std::{
     time::Duration,
 };
 use zovereign_core::{
-    manager::{LogMode, DEFAULT_IMAGE},
+    config::atomic_json,
+    manager::{epoch, ImageSource, LogMode, DEFAULT_IMAGE},
     startup, Manager, StateStore,
 };
 
@@ -29,10 +30,12 @@ struct Cli {
     /// Skip interactive confirmation for nondestructive operations.
     #[arg(short = 'y', long, global = true)]
     yes: bool,
-    #[arg(long, conflicts_with = "stats")]
+    #[arg(long,conflicts_with_all=["stats","update"])]
     health: bool,
-    #[arg(long, conflicts_with = "health")]
+    #[arg(long,conflicts_with_all=["health","update"])]
     stats: bool,
+    #[arg(long,conflicts_with_all=["health","stats"])]
+    update: bool,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -79,8 +82,22 @@ enum Commands {
     Doctor,
     /// Safe targeted recovery. Databases are never deleted by this command.
     Repair {
-        #[arg(long,value_parser=["restart"],default_value="restart")]
+        #[arg(long,value_parser=["restart","rollback"],default_value="restart")]
         action: String,
+    },
+    /// Pull/check a candidate image, update, roll back, or accept the new runtime.
+    Update {
+        #[arg(long,default_value=DEFAULT_IMAGE)]
+        image: String,
+        /// Use an image already present on the selected Docker engine.
+        #[arg(long, conflicts_with_all=["rollback", "accept"])]
+        local_image: bool,
+        #[arg(long,conflicts_with_all=["rollback","accept"])]
+        check: bool,
+        #[arg(long, conflicts_with = "accept")]
+        rollback: bool,
+        #[arg(long)]
+        accept: bool,
     },
     /// Configure Docker restarts or print a host monitor service template.
     Startup {
@@ -92,12 +109,15 @@ enum Commands {
         #[arg(long)]
         system: bool,
     },
-    /// Persist periodic read-only health observations.
+    /// Persist periodic health observations and daily release notices.
     Agent {
         #[arg(long, default_value_t = 60)]
         interval: u64,
         #[arg(long)]
         once: bool,
+        /// Disable network release checks for offline installations.
+        #[arg(long)]
+        no_update_check: bool,
     },
 }
 fn confirm(message: &str, cli: &Cli) -> Result<()> {
@@ -187,9 +207,80 @@ fn print_value(v: &Value, cli: &Cli) -> Result<()> {
     Ok(())
 }
 
+fn release_notice(m: &Manager) -> Result<()> {
+    let path = m.store().root().join("release.json");
+    if let Ok(b) = std::fs::read(path) {
+        let v: Value = serde_json::from_slice(&b)?;
+        if v["available"] == true {
+            eprintln!("Zovereign release {} is available. Review it with 'zovereign update --check --image {}'.",v["tag"],v["image"]);
+        }
+    }
+    Ok(())
+}
+fn check_release(m: &Manager) -> Result<()> {
+    let p = m.store().root().join("release.json");
+    if let Ok(b) = std::fs::read(&p) {
+        if let Ok(v) = serde_json::from_slice::<Value>(&b) {
+            if epoch().saturating_sub(v["checked_at"].as_u64().unwrap_or(0)) < 86400 {
+                return Ok(());
+            }
+        }
+    }
+    let out = std::process::Command::new("curl")
+        .args([
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--proto",
+            "=https",
+            "--proto-redir",
+            "=https",
+            "--connect-timeout",
+            "5",
+            "--max-time",
+            "15",
+            "--max-filesize",
+            "1048576",
+            "-H",
+            "Accept: application/vnd.github+json",
+            "-H",
+            "User-Agent: zovereign-cli",
+            "https://api.github.com/repos/zcashlabs/zovereign/releases/latest",
+        ])
+        .output()
+        .context("Install curl for background release checks")?;
+    if !out.status.success() {
+        bail!("Release check unavailable; services continue running");
+    }
+    let r: Value = serde_json::from_slice(&out.stdout)?;
+    let tag = r["tag_name"].as_str().context("Release has no tag")?;
+    if !tag.starts_with('v')
+        || !tag
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b".-".contains(&b))
+    {
+        bail!("Invalid release tag");
+    }
+    let c = m.config()?;
+    let info = m
+        .docker()
+        .inspect("image", &c.image)?
+        .context("Current image unavailable")?;
+    let current = info["Config"]["Labels"]["org.opencontainers.image.revision"]
+        .as_str()
+        .unwrap_or("");
+    let target = r["target_commitish"].as_str().unwrap_or("");
+    let comparable =
+        current.len() == 40 && target.len() == 40 && target.bytes().all(|b| b.is_ascii_hexdigit());
+    Ok(atomic_json(
+        &p,
+        &json!({"checked_at":epoch(),"tag":tag,"image":format!("ghcr.io/zcashlabs/zovereign:{tag}"),"available":comparable && current!=target,"comparison_known":comparable,"url":r["html_url"]}),
+    )?)
+}
 fn run(cli: &Cli) -> Result<i32> {
-    if cli.command.is_some() && (cli.health || cli.stats) {
-        bail!("Use a command or a --health/--stats alias, not both");
+    if cli.command.is_some() && (cli.health || cli.stats || cli.update) {
+        bail!("Use a command or a --health/--stats/--update alias, not both");
     }
     let root = cli
         .config_dir
@@ -201,6 +292,14 @@ fn run(cli: &Cli) -> Result<i32> {
         Commands::Health
     } else if cli.stats {
         Commands::Stats { watch: false }
+    } else if cli.update {
+        Commands::Update {
+            image: DEFAULT_IMAGE.into(),
+            local_image: false,
+            check: false,
+            rollback: false,
+            accept: false,
+        }
     } else {
         match &cli.command {
             Some(command) => return dispatch(cli, &m, command),
@@ -222,6 +321,9 @@ fn run(cli: &Cli) -> Result<i32> {
     dispatch(cli, &m, &command)
 }
 fn dispatch(cli: &Cli, m: &Manager, command: &Commands) -> Result<i32> {
+    if !cli.json {
+        release_notice(m).ok();
+    }
     let v = match command {
         Commands::Check => m.preflight()?,
         Commands::Setup {
@@ -291,12 +393,50 @@ fn dispatch(cli: &Cli, m: &Manager, command: &Commands) -> Result<i32> {
         }
         Commands::Connect => m.connect()?,
         Commands::Doctor => m.doctor()?,
-        Commands::Repair { .. } => {
+        Commands::Repair { action } => {
             confirm(
                 "Apply this recovery action? Databases and volumes will be retained.",
                 cli,
             )?;
-            m.restart()?
+            if action == "rollback" {
+                m.rollback()?
+            } else {
+                m.restart()?
+            }
+        }
+        Commands::Update {
+            image,
+            local_image,
+            check,
+            rollback,
+            accept,
+        } => {
+            if *check {
+                m.updates(
+                    image,
+                    if *local_image {
+                        ImageSource::Local
+                    } else {
+                        ImageSource::Registry
+                    },
+                )?
+            } else {
+                confirm("Change the runtime? Services may be briefly unavailable; databases will be retained.",cli)?;
+                if *rollback {
+                    m.rollback()?
+                } else if *accept {
+                    m.accept_update()?
+                } else {
+                    m.update(
+                        image,
+                        if *local_image {
+                            ImageSource::Local
+                        } else {
+                            ImageSource::Registry
+                        },
+                    )?
+                }
+            }
         }
         Commands::Startup {
             action,
@@ -358,8 +498,17 @@ fn dispatch(cli: &Cli, m: &Manager, command: &Commands) -> Result<i32> {
                 json!({"restart_policy":policy,"host_startup":"Ensure Docker itself starts at boot/login. Use startup render for the optional monitor. Linux user services require login or lingering."})
             }
         }
-        Commands::Agent { interval, once } => loop {
+        Commands::Agent {
+            interval,
+            once,
+            no_update_check,
+        } => loop {
             m.record_observation()?;
+            if !no_update_check {
+                if let Err(e) = check_release(m) {
+                    eprintln!("{e}");
+                }
+            }
             if *once {
                 return Ok(0);
             }
