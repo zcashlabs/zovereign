@@ -6,6 +6,7 @@ use crate::{
 use crate::{error::bail, Result};
 use anyhow::Context;
 use serde_json::{json, Value};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The published image selected by setup unless the caller chooses another.
 pub const DEFAULT_IMAGE: &str = "ghcr.io/zcashlabs/zovereign:latest";
@@ -389,8 +390,98 @@ impl Manager {
             json!({"bindings":i["HostConfig"]["PortBindings"]["9067/tcp"],"tls":e.contains_key("TLS_CERT"),"docker_context":c.context,"instructions":"Bindings are on the Docker host. For localhost access use a wallet supporting custom servers. For another device use a trusted tunnel or TLS; never expose plaintext gRPC publicly."}),
         )
     }
+    /// Collect actionable observations without modifying services or databases.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if installation identity or required Docker observations cannot be read.
+    pub fn doctor(&self) -> Result<Value> {
+        let c = self.config()?;
+        self.check_engine(&c)?;
+        let mut findings = Vec::new();
+        if let Some(i) = self.docker.inspect("container", &c.container)? {
+            validate_installation(&i)?;
+            if i["State"]["OOMKilled"] == true {
+                findings.push("Out of memory: increase Docker/VM memory".into());
+            }
+            if !i["State"]["Error"].as_str().unwrap_or("").is_empty() {
+                findings.push(i["State"]["Error"].to_string());
+            }
+            if i["State"]["Health"]["Status"] == "unhealthy" {
+                findings.push(
+                    "Health checks failed: inspect logs and runtime progress before restarting"
+                        .into(),
+                );
+            }
+            if i["State"]["Running"] == true {
+                let disk = self.docker.json(&s(&[
+                    "exec",
+                    &c.container,
+                    "python3",
+                    "-c",
+                    CAPACITY_SCRIPT,
+                ]))?;
+                if disk["free_bytes"].as_u64().unwrap_or(0) < 20 * 1024_u64.pow(3) {
+                    findings.push("Less than 20 GiB free: expand the data disk".into());
+                }
+                let logs = self
+                    .docker
+                    .output(&s(&["logs", "--tail", "200", &c.container]))?;
+                if !logs.status.success() {
+                    bail!(
+                        "Docker logs failed: {}",
+                        String::from_utf8_lossy(&logs.stderr).trim()
+                    );
+                }
+                if String::from_utf8_lossy(&logs.stdout).contains("CORRUPTION")
+                    || String::from_utf8_lossy(&logs.stderr).contains("CORRUPTION")
+                {
+                    findings.push("lightwalletd reported cache corruption; observe its native cache recovery before rebuilding".into());
+                }
+            }
+        } else {
+            findings.push("Managed container is missing; inspect the Docker context and installation record before recreating it".into());
+        }
+        Ok(json!({"findings":findings,"data_preserved":true}))
+    }
+    /// Restart a runtime that is intended to run.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an intentional stop, identity failure or unsuccessful restart.
+    pub fn restart(&self) -> Result<Value> {
+        let _lock = self.store.lock()?;
+        let c = self.config()?;
+        self.installation(&c)?;
+        if !c.desired_running {
+            bail!("Installation is intentionally stopped; use start explicitly");
+        }
+        self.docker
+            .run(&s(&["restart", "-t", "120", &c.container]))?;
+        Ok(json!({"restarted":c.container,"data_preserved":true}))
+    }
+    /// Persist one observation without restarting or changing the runtime.
+    ///
+    /// # Errors
+    /// Returns an error if the monitor record cannot be written durably.
+    pub fn record_observation(&self) -> Result<()> {
+        let report = self
+            .status()
+            .unwrap_or_else(|e| json!({"error":format!("{e:#}")}));
+        crate::config::atomic_json(
+            &self.store.root().join("monitor.json"),
+            &json!({"checked_at":epoch(),"status":report}),
+        )
+    }
 }
 
+/// Return the current Unix timestamp, using zero if the clock predates the epoch.
+pub fn epoch() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
 fn text(v: &Value) -> Result<String> {
     Ok(v.as_str()
         .map(str::to_string)

@@ -6,6 +6,7 @@ pub use error::{Error, Result};
 pub mod config;
 pub mod docker;
 pub mod manager;
+pub mod startup;
 pub use config::{Config, StateStore};
 pub use docker::Docker;
 pub use manager::Manager;

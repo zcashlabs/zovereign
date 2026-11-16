@@ -1,5 +1,5 @@
 //! Terminal presentation and prompts for the shared Zovereign installation operations.
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 use std::{
@@ -10,7 +10,7 @@ use std::{
 };
 use zovereign_core::{
     manager::{LogMode, DEFAULT_IMAGE},
-    Manager, StateStore,
+    startup, Manager, StateStore,
 };
 
 #[derive(Parser)]
@@ -76,6 +76,29 @@ enum Commands {
         tail: u32,
     },
     Connect,
+    Doctor,
+    /// Safe targeted recovery. Databases are never deleted by this command.
+    Repair {
+        #[arg(long,value_parser=["restart"],default_value="restart")]
+        action: String,
+    },
+    /// Configure Docker restarts or print a host monitor service template.
+    Startup {
+        #[arg(value_parser=["enable","disable","render","install","uninstall"],default_value="render")]
+        action: String,
+        #[arg(long)]
+        platform: Option<String>,
+        /// Install a Linux system service instead of a user service (requires root).
+        #[arg(long)]
+        system: bool,
+    },
+    /// Persist periodic read-only health observations.
+    Agent {
+        #[arg(long, default_value_t = 60)]
+        interval: u64,
+        #[arg(long)]
+        once: bool,
+    },
 }
 fn confirm(message: &str, cli: &Cli) -> Result<()> {
     if cli.yes {
@@ -267,6 +290,81 @@ fn dispatch(cli: &Cli, m: &Manager, command: &Commands) -> Result<i32> {
             return Ok(0);
         }
         Commands::Connect => m.connect()?,
+        Commands::Doctor => m.doctor()?,
+        Commands::Repair { .. } => {
+            confirm(
+                "Apply this recovery action? Databases and volumes will be retained.",
+                cli,
+            )?;
+            m.restart()?
+        }
+        Commands::Startup {
+            action,
+            platform,
+            system,
+        } => {
+            if action == "install" || action == "uninstall" {
+                m.config()?;
+                confirm("Install/remove the host status monitor service?", cli)?;
+                let root = m.store().root().canonicalize()?;
+                let path = startup::configure(
+                    &std::env::current_exe()?,
+                    &root,
+                    if *system {
+                        startup::ServiceScope::System
+                    } else {
+                        startup::ServiceScope::User
+                    },
+                    if action == "uninstall" {
+                        startup::ServiceAction::Uninstall
+                    } else {
+                        startup::ServiceAction::Install
+                    },
+                )?;
+                json!({"service_file":path,"action":action,"note":"Docker must start independently at boot/login. A Linux user service requires login or lingering."})
+            } else if action == "render" {
+                let platform = platform
+                    .clone()
+                    .unwrap_or_else(|| std::env::consts::OS.into());
+                let root = m
+                    .store()
+                    .root()
+                    .canonicalize()
+                    .context("Run setup/adopt before rendering startup configuration")?;
+                let template = startup::render(&platform, &std::env::current_exe()?, &root)?;
+                if cli.json {
+                    json!({"platform":platform,"template":template})
+                } else {
+                    io::stdout().write_all(template.as_bytes())?;
+                    return Ok(0);
+                }
+            } else {
+                confirm("Change this container's Docker restart policy?", cli)?;
+                // No shell/systemd assumption: works with rootless Docker and any init.
+                let _lock = m.store().lock()?;
+                let c = m.config()?;
+                m.status()?;
+                let policy = if action == "enable" {
+                    "unless-stopped"
+                } else {
+                    "no"
+                };
+                m.docker().run(&zovereign_core::docker::s(&[
+                    "update",
+                    "--restart",
+                    policy,
+                    &c.container,
+                ]))?;
+                json!({"restart_policy":policy,"host_startup":"Ensure Docker itself starts at boot/login. Use startup render for the optional monitor. Linux user services require login or lingering."})
+            }
+        }
+        Commands::Agent { interval, once } => loop {
+            m.record_observation()?;
+            if *once {
+                return Ok(0);
+            }
+            thread::sleep(Duration::from_secs((*interval).max(10)));
+        },
     };
     let failed = matches!(command, Commands::Check) && v["ready"] != true;
     print_value(&v, cli)?;

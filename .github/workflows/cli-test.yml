@@ -1,7 +1,7 @@
 name: Test and package CLI
 on:
   pull_request:
-    paths: ['Cargo.toml', 'Cargo.lock', 'clippy.toml', 'crates/**', 'tests/test_cli*', 'tests/fake_docker.py', 'tests/docker_fixture/**', 'docker/stack.py', '.github/workflows/cli-test.yml']
+    paths: ['Cargo.toml', 'Cargo.lock', 'clippy.toml', 'crates/**', 'tests/test_cli*', 'tests/cli_test_support.py', 'tests/fake_docker.py', 'tests/docker_fixture/**', 'docker/stack.py', '.github/workflows/cli-test.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -59,7 +59,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --locked
       - run: docker info
-      - name: Test real containers, daily commands and persistent volumes
+      - name: Test real containers, persistence and monitor environments
         run: python3 tests/test_cli_docker.py -v
         env:
           ZOVEREIGN_DOCKER_INTEGRATION: '1'
