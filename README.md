@@ -8,6 +8,12 @@ lightwalletd connects to the RPC on your bundled Zakura node.
 
 **[Visit the website](https://zcashlabs.github.io/zovereign/)**
 
+## Host CLI (in development)
+
+A Rust CLI and reusable management library are being developed around this image.
+See [CLI setup, commands and current limits](docs/cli.md). Build locally with
+`cargo build --locked`; no CLI binaries have been released by this change.
+
 ## Quick start
 
 Install Docker with the Compose plugin, then run:

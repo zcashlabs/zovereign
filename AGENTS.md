@@ -10,6 +10,17 @@ CONTRIBUTING.md, and docs/single-container.md first.
 
 ## Code map
 
+- `crates/zovereign-core`: shared host management; never remove data volumes.
+- `crates/zovereign-cli`: terminal commands and prompts; keep `--json` usable.
+- `docs/cli.md`: host CLI commands, platform limits and pending VM acceptance.
+- `tests/test_cli_workflows.py`: fast workflows against a fake Docker boundary.
+- `tests/test_cli_docker.py` and `tests/docker_fixture/`: opt-in real Docker
+  lifecycle tests; small HTTP fixtures, no Zcash data. Pin the selected context
+  and remove only this test run's labelled resources, never deployment volumes.
+- Keep public CLI/test commands independent of a Docker provider and user path.
+  Discover/select a context and preserve its identity; test nondefault
+  executable/config paths.
+
 - `docker/stack.py`: snapshot selection, range download, checksum verification,
   staged extraction, privilege dropping, supervision, and health probes.
 - `Dockerfile`: pinned Zakura/grpcurl images, checksum-pinned lightwalletd
@@ -85,3 +96,12 @@ when upgrading. Never commit credentials, `.env`, node databases, downloaded
 archives, Terraform state, or raw private deployment reports. Keep the Docker
 context allowlist narrow. Public registry visibility requires verification;
 do not advertise anonymous pulls before they work.
+
+## Rust management code
+
+Use the installed BeautifulRust `rust-best-practices` and `rust-review` skills
+when available. Workspace lints enforce selected rules: no production unwraps,
+explicit shared operation modes, documented errors and safe-code explanations.
+Keep CLI presentation in the CLI crate and shared lifecycle operations reusable.
+Run `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`,
+`cargo test --workspace --locked` and `cargo doc --workspace --no-deps --locked`.

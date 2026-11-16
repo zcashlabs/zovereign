@@ -24,6 +24,8 @@ RPC_URL = "http://127.0.0.1:8232"
 CHILDREN = set()
 VOLUME_LOCK = None
 LOG_THREADS = []
+STATUS_ROOT = None
+PROGRESS = {}
 
 
 class StackError(Exception):
@@ -52,7 +54,15 @@ def spawn(args, **kwargs):
 
 def stop(process, grace=90):
     if process.poll() is None:
-        os.killpg(process.pid, signal.SIGTERM)
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            # A short-lived child can disappear after poll but before killpg.
+            # Only ignore a signal error when wait proves the child has exited.
+            try:
+                process.wait(timeout=0.1)
+            except subprocess.TimeoutExpired:
+                raise
         try:
             process.wait(timeout=grace)
         except subprocess.TimeoutExpired:
@@ -84,6 +94,35 @@ def write_json(path, value):
         output.flush()
         os.fsync(output.fileno())
     temporary.replace(path)
+
+
+def progress(phase, service=None, **fields):
+    """Publish durable progress for CLI/desktop readers; probes never write it."""
+    if STATUS_ROOT is None:
+        return
+    PROGRESS.clear()
+    PROGRESS.update(schema_version=1, phase=phase, service=service,
+                    updated_at=int(time.time()), **fields)
+    try:
+        write_json(STATUS_ROOT / "status.json", PROGRESS)
+    except OSError as error:
+        log(f"Could not publish progress: {error}")
+
+
+def status(root):
+    """Observe an existing installation without starting bootstrap or daemons."""
+    path = root / "status.json"
+    result = json.loads(path.read_text()) if path.is_file() else {
+        "schema_version": 1, "phase": "unknown", "message": "No progress recorded yet"
+    }
+    disk = shutil.disk_usage(root)
+    result["storage"] = {"free_bytes": disk.free, "total_bytes": disk.total}
+    try:
+        node = blockchain_info()
+        result["node"] = {key: node.get(key) for key in ("blocks", "estimatedheight", "bestblockhash", "pruned", "chain")}
+    except (OSError, ValueError, StackError) as error:
+        result["node_error"] = str(error)
+    return result
 
 
 def http_url(value):
@@ -181,6 +220,7 @@ def download(item, archive, chunk_bytes, reserve_bytes, workers=1):
         pending.append(job)
         next_offset = end + 1
 
+    progress("downloading", archive.name.split(".")[0], completed_bytes=offset, total_bytes=size)
     log(f"Downloading {archive.name}: {offset:,}/{size:,} bytes (resuming stored progress; {workers} connections)")
     try:
         for _ in range(workers):
@@ -218,6 +258,7 @@ def download(item, archive, chunk_bytes, reserve_bytes, workers=1):
                     output.truncate(offset)
                     raise
                 offset = end + 1
+                progress("downloading", archive.name.split(".")[0], completed_bytes=offset, total_bytes=size)
                 log(f"{archive.name}: {offset:,}/{size:,} bytes ({offset * 100 // size}%)")
                 chunk.unlink(missing_ok=True)
                 headers.unlink(missing_ok=True)
@@ -229,6 +270,7 @@ def download(item, archive, chunk_bytes, reserve_bytes, workers=1):
                 stop(job["process"], grace=5)
             job["chunk"].unlink(missing_ok=True)
             job["headers"].unlink(missing_ok=True)
+    progress("verifying", archive.name.split(".")[0], total_bytes=size)
     log(f"Verifying SHA-256 of {archive.name}")
     if sha256(archive) != item["sha256"].lower():
         archive.unlink()
@@ -271,6 +313,7 @@ def extract(kind, archive, destination, reserve_bytes):
 
 
 def bootstrap(kind, root, manifest_url, chunk_bytes, reserve_bytes):
+    progress("checking_database", kind)
     target = root / kind
     marker = target / ".bootstrap.json"
     cache = root / "bootstrap"
@@ -304,6 +347,7 @@ def bootstrap(kind, root, manifest_url, chunk_bytes, reserve_bytes):
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir()
+    progress("restoring", kind)
     log(f"Extracting verified {kind} archive")
     try:
         extract(kind, archive, staging, reserve_bytes)
@@ -411,6 +455,7 @@ def supervise(root):
         except (OSError, ValueError, StackError) as error:
             status = f"Waiting for Zakura RPC: {error}"
         if time.monotonic() - last_report > 30:
+            progress("syncing", "zakura", message=status)
             log(status)
             last_report = time.monotonic()
         if time.monotonic() - waiting_since > timeout:
@@ -423,6 +468,7 @@ def supervise(root):
     if bool(tls_cert) != bool(tls_key):
         raise StackError("Set both TLS_CERT and TLS_KEY, or neither")
     tls = [f"--tls-cert={tls_cert}", f"--tls-key={tls_key}"] if tls_cert else ["--no-tls-very-insecure"]
+    progress("starting", "lightwalletd")
     log("Starting snapshot-restored lightwalletd against the bundled Zakura RPC")
     lightwalletd = start_lightwalletd([
         "lightwalletd", "--grpc-bind-addr=0.0.0.0:9067", "--http-bind-addr=127.0.0.1:9068",
@@ -430,14 +476,22 @@ def supervise(root):
         "--log-file=/dev/stdout", "--log-level=4", *tls,
     ])
     log("Both processes started; Docker health becomes healthy when compact blocks can be served near the node tip")
+    last_health = 0
     while zakura.poll() is None and lightwalletd.poll() is None:
+        if time.monotonic() - last_health >= 30:
+            try:
+                served = health()
+                progress("ready", compact_block_height=served)
+            except (OSError, ValueError, StackError) as error:
+                progress("syncing", message=str(error))
+            last_health = time.monotonic()
         time.sleep(1)
     failed = "Zakura" if zakura.poll() is not None else "lightwalletd"
     raise StackError(f"{failed} exited; stopping the other service so Docker can restart the complete stack")
 
 
 def run():
-    global VOLUME_LOCK
+    global VOLUME_LOCK, STATUS_ROOT
     root = Path(os.environ.get("DATA_DIR", "/data")).resolve()
     root.mkdir(parents=True, exist_ok=True)
     cache = root / "bootstrap"
@@ -453,6 +507,8 @@ def run():
         fcntl.flock(VOLUME_LOCK, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError as error:
         raise StackError("Another stack is already using this data volume") from error
+    STATUS_ROOT = root
+    progress("initializing")
     chunk_bytes = positive_int(os.environ.get("DOWNLOAD_CHUNK_MIB", "256"), "DOWNLOAD_CHUNK_MIB") * 1024 * 1024
     reserve_bytes = positive_int(os.environ.get("DISK_RESERVE_GIB", "20"), "DISK_RESERVE_GIB", minimum=0) * 1024**3
     positive_int(os.environ.get("RPC_READY_TIMEOUT", "86400"), "RPC_READY_TIMEOUT")
@@ -469,21 +525,25 @@ def run():
 
 def main():
     mode = sys.argv[1] if len(sys.argv) == 2 else ""
-    if mode not in ("run", "health"):
-        print("usage: stack.py run|health", file=sys.stderr)
+    if mode not in ("run", "health", "status"):
+        print("usage: stack.py run|health|status", file=sys.stderr)
         return 2
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
     try:
-        if mode == "health":
+        if mode == "status":
+            print(json.dumps(status(Path(os.environ.get("DATA_DIR", "/data")))))
+        elif mode == "health":
             log(f"Healthy: compact block {health()} served through the bundled node")
         else:
             run()
         return 0
     except Shutdown:
+        progress("stopped", message="Services stopped; persistent data retained")
         log("Stopping; persistent databases and completed download ranges are retained")
         return 0
     except (StackError, OSError, ValueError, tarfile.TarError) as error:
+        progress("error", message=str(error))
         log(f"ERROR: {error}")
         return 1
     finally:

@@ -5,6 +5,26 @@ container. The [deployment guide](docs/single-container.md) describes startup,
 on-disk state, failure recovery, and the trust boundary. Read [AGENTS.md](AGENTS.md)
 before changing the runtime.
 
+## Host CLI
+
+See [the CLI guide](docs/cli.md) for architecture, commands and platform limits.
+Run `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`,
+`cargo test --workspace --locked`, `cargo build --locked`, then
+`python3 -m unittest discover -s tests -p 'test_cli_*.py' -v`. The default suite
+uses a fake Docker boundary and skips opt-in engine tests. With an existing
+Docker engine running, also run:
+
+```bash
+ZOVEREIGN_DOCKER_INTEGRATION=1 python3 tests/test_cli_docker.py -v
+```
+
+This builds tiny fixture images and exercises the real Docker CLI, isolated
+containers and persistent volumes without downloading blockchain data. It uses
+your current context; set `ZOVEREIGN_DOCKER_CONTEXT` to choose another. See
+[the CLI verification guide](docs/cli.md#real-docker-management-integration)
+for platform-neutral commands, coverage and cleanup. Linux amd64/arm64 CI runs these tests too.
+Full-runtime, VM reboot and mainnet acceptance remain separate release gates.
+
 ## Build and test without a blockchain download
 
 Use a Linux amd64 or arm64 Docker host. From the repository root:

@@ -1,0 +1,65 @@
+name: Test and package CLI
+on:
+  pull_request:
+    paths: ['Cargo.toml', 'Cargo.lock', 'clippy.toml', 'crates/**', 'tests/test_cli*', 'tests/fake_docker.py', 'tests/docker_fixture/**', 'docker/stack.py', '.github/workflows/cli-test.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt, clippy
+      - name: Install static Linux linker
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo doc --workspace --no-deps --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo build --locked
+      - run: python3 -m unittest discover -s tests -p 'test_cli_*.py' -v
+      - name: Build standalone binary
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zovereign-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/zovereign
+  docker-integration:
+    name: Real Docker CLI (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked
+      - run: docker info
+      - name: Test real containers, daily commands and persistent volumes
+        run: python3 tests/test_cli_docker.py -v
+        env:
+          ZOVEREIGN_DOCKER_INTEGRATION: '1'
