@@ -13,6 +13,13 @@ use zovereign_core::{
     Manager, StateStore,
 };
 
+// Shared by Clap's explicit setup and the command-free first-run path.
+const DEFAULT_CONTAINER: &str = "zovereign";
+const DEFAULT_VOLUME: &str = "zovereign-data";
+const DEFAULT_GRPC_PORT: u16 = 9067;
+const DEFAULT_P2P_PORT: u16 = 8233;
+const DEFAULT_LOCAL_IMAGE: bool = false;
+
 #[derive(Parser)]
 #[command(
     version,
@@ -43,20 +50,20 @@ enum Commands {
         #[arg(long,default_value=DEFAULT_IMAGE)]
         image: String,
         /// Use a local/preloaded image without contacting its registry.
-        #[arg(long)]
+        #[arg(long, default_value_t = DEFAULT_LOCAL_IMAGE)]
         local_image: bool,
-        #[arg(long, default_value = "zovereign")]
+        #[arg(long, default_value = DEFAULT_CONTAINER)]
         container: String,
-        #[arg(long, default_value = "zovereign-data")]
+        #[arg(long, default_value = DEFAULT_VOLUME)]
         volume: String,
-        #[arg(long, default_value_t = 9067)]
+        #[arg(long, default_value_t = DEFAULT_GRPC_PORT)]
         grpc_port: u16,
-        #[arg(long, default_value_t = 8233)]
+        #[arg(long, default_value_t = DEFAULT_P2P_PORT)]
         p2p_port: u16,
     },
     /// Adopt a README/Compose deployment without changing its container.
     Adopt {
-        #[arg(long, default_value = "zovereign")]
+        #[arg(long, default_value = DEFAULT_CONTAINER)]
         container: String,
     },
     /// Check resources visible to the selected Docker engine.
@@ -190,11 +197,11 @@ fn run(cli: &Cli) -> Result<i32> {
                 } else {
                     Commands::Setup {
                         image: DEFAULT_IMAGE.into(),
-                        local_image: false,
-                        container: "zovereign".into(),
-                        volume: "zovereign-data".into(),
-                        grpc_port: 9067,
-                        p2p_port: 8233,
+                        local_image: DEFAULT_LOCAL_IMAGE,
+                        container: DEFAULT_CONTAINER.into(),
+                        volume: DEFAULT_VOLUME.into(),
+                        grpc_port: DEFAULT_GRPC_PORT,
+                        p2p_port: DEFAULT_P2P_PORT,
                     }
                 }
             }

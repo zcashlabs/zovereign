@@ -220,6 +220,14 @@ class DockerIntegration(unittest.TestCase):
         self.assertTrue(after["State"]["Running"])
         self.assertEqual(self.docker("exec", name, "cat", "/data/identity.json").stdout, identity)
 
+    def test_missing_container_adoption_reports_absence(self):
+        config = Path(self.tmp.name) / "missing-container-config"
+        result = self.cli("adopt", "--container", f"{self.name}-missing", "--yes",
+                          config_dir=config, ok=False)
+        self.assertIn("Container does not exist", json.loads(result.stdout)["error"])
+        self.assertFalse((config / "installation.json").exists())
+        self.assertTrue(self.inspect()["State"]["Running"])
+
 
 
 

@@ -29,7 +29,9 @@ class Workflows(unittest.TestCase):
     def save(self,s):self.path.write_text(json.dumps(s))
     def fresh_setup(self):
         import shutil
-        shutil.rmtree(self.root/'config')
+        config = self.root / 'config'
+        if config.exists():
+            shutil.rmtree(config)
         s=self.state();s['containers']={};s['calls']=[];self.save(s)
     def test_setup_creates_a_managed_installation(self):
         self.fresh_setup()
@@ -168,5 +170,43 @@ class Workflows(unittest.TestCase):
                 self.assertNotIn('[y/N]', result.stderr)
                 self.assertEqual(self.state()['calls'], before)
                 self.assertEqual((self.root / 'config/installation.json').read_bytes(), record)
+
+    def test_docker_uses_a_stable_locale_for_captured_and_streamed_commands(self):
+        self.env.update(LANG='fr_FR.UTF-8', LC_ALL='fr_FR.UTF-8')
+        state = self.state()
+        state['locales'] = []
+        self.save(state)
+        self.cli('status')
+        self.cli('logs')
+        locales = self.state()['locales']
+        self.assertTrue(locales)
+        self.assertTrue(all(value == {'LANG': 'C', 'LC_ALL': 'C'} for value in locales), locales)
+
+    def test_unrelated_inspect_failures_never_trigger_setup(self):
+        for message in ('Error response from daemon: Docker context test not found',
+                        'Cannot connect to the daemon: No such file or directory',
+                        'SSH transport failed: No such image: candidate'):
+            with self.subTest(message=message):
+                self.fresh_setup()
+                state = self.state()
+                state['inspect_errors'] = {'container': message}
+                self.save(state)
+                result = self.cli('setup', '--image', 'candidate', '--yes', ok=False)
+                self.assertIn(message, json.loads(result.stdout)['error'])
+                self.assertFalse(any(call[0] in ('pull', 'create', 'start') or
+                                     call[:2] == ['volume', 'create'] for call in self.state()['calls']))
+                self.assertFalse((self.root / 'config/installation.json').exists())
+
+    def test_first_run_and_explicit_setup_use_identical_defaults(self):
+        observations = []
+        for command in ((), ('setup',)):
+            self.fresh_setup()
+            state = self.state()
+            state['images']['ghcr.io/zcashlabs/zovereign:latest'] = copy.deepcopy(IMAGE)
+            self.save(state)
+            self.cli(*command, '--yes')
+            observations.append((self.state()['calls'],
+                                 json.loads((self.root / 'config/installation.json').read_text())))
+        self.assertEqual(observations[0], observations[1])
 
 if __name__=='__main__':unittest.main()
