@@ -50,13 +50,26 @@ def spawn(args, **kwargs):
     return process
 
 
+def signal_group(process, number):
+    try:
+        os.killpg(process.pid, number)
+    except (ProcessLookupError, PermissionError) as error:
+        # Darwin can reject signals to an exiting group before waitpid exposes
+        # the child's exit status. Reap that child, but never silently leave a
+        # live process behind if its group cannot be signalled.
+        try:
+            process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            raise error
+
+
 def stop(process, grace=90):
     if process.poll() is None:
-        os.killpg(process.pid, signal.SIGTERM)
+        signal_group(process, signal.SIGTERM)
         try:
             process.wait(timeout=grace)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
+            signal_group(process, signal.SIGKILL)
             process.wait()
     CHILDREN.discard(process)
 
@@ -334,13 +347,28 @@ def near_tip(info):
     return int(info.get("blocks", 0)) > 0 and int(info.get("estimatedheight", 2**32)) - int(info["blocks"]) <= 5
 
 
+def grpc_bind_address():
+    address = os.environ.get("GRPC_BIND_ADDR", "0.0.0.0:9067")
+    try:
+        parsed = urlparse("//" + address)
+        if (not parsed.hostname or parsed.port is None or not 1 <= parsed.port <= 65535
+                or parsed.path or parsed.query or parsed.fragment or parsed.username is not None):
+            raise ValueError()
+        return address, parsed
+    except ValueError as error:
+        raise StackError("GRPC_BIND_ADDR must be a host:port address with a port from 1 to 65535") from error
+
+
 def grpc(method, data=None):
-    # The probe stays on loopback; external clients must validate the server certificate.
+    # Probe wildcard listeners over loopback; external clients must validate certificates.
     transport = "-insecure" if os.environ.get("TLS_CERT") else "-plaintext"
     args = ["grpcurl", transport, "-max-time", "5"]
     if data is not None:
         args.extend(["-d", json.dumps(data)])
-    args.extend(["127.0.0.1:9067", f"cash.z.wallet.sdk.rpc.CompactTxStreamer/{method}"])
+    _, listener = grpc_bind_address()
+    host = {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(listener.hostname, listener.hostname)
+    target = f"[{host}]:{listener.port}" if ":" in host else f"{host}:{listener.port}"
+    args.extend([target, f"cash.z.wallet.sdk.rpc.CompactTxStreamer/{method}"])
     return json.loads(command(args, capture=True, timeout=8, stderr=subprocess.DEVNULL))
 
 
@@ -425,15 +453,15 @@ def supervise(root):
     tls = [f"--tls-cert={tls_cert}", f"--tls-key={tls_key}"] if tls_cert else ["--no-tls-very-insecure"]
     log("Starting snapshot-restored lightwalletd against the bundled Zakura RPC")
     lightwalletd = start_lightwalletd([
-        "lightwalletd", "--grpc-bind-addr=0.0.0.0:9067", "--http-bind-addr=127.0.0.1:9068",
+        "lightwalletd", f"--grpc-bind-addr={grpc_bind_address()[0]}", "--http-bind-addr=127.0.0.1:9068",
         f"--zcash-conf-path={config}", f"--data-dir={root / 'lightwalletd'}",
         "--log-file=/dev/stdout", "--log-level=4", *tls,
     ])
-    log("Both processes started; Docker health becomes healthy when compact blocks can be served near the node tip")
+    log("Both processes started; health succeeds when compact blocks can be served near the node tip")
     while zakura.poll() is None and lightwalletd.poll() is None:
         time.sleep(1)
     failed = "Zakura" if zakura.poll() is not None else "lightwalletd"
-    raise StackError(f"{failed} exited; stopping the other service so Docker can restart the complete stack")
+    raise StackError(f"{failed} exited; stopping the other service")
 
 
 def run():
@@ -456,11 +484,12 @@ def run():
     chunk_bytes = positive_int(os.environ.get("DOWNLOAD_CHUNK_MIB", "256"), "DOWNLOAD_CHUNK_MIB") * 1024 * 1024
     reserve_bytes = positive_int(os.environ.get("DISK_RESERVE_GIB", "20"), "DISK_RESERVE_GIB", minimum=0) * 1024**3
     positive_int(os.environ.get("RPC_READY_TIMEOUT", "86400"), "RPC_READY_TIMEOUT")
+    grpc_bind_address()
     certificate, key = os.environ.get("TLS_CERT"), os.environ.get("TLS_KEY")
     if bool(certificate) != bool(key):
         raise StackError("Set both TLS_CERT and TLS_KEY, or neither")
     if certificate and not all(Path(path).is_file() and os.access(path, os.R_OK) for path in (certificate, key)):
-        raise StackError("TLS certificate and key must be readable by UID 10001")
+        raise StackError(f"TLS certificate and key must be readable by UID {os.getuid()}")
     for kind, url in (("zakura", os.environ.get("ZAKURA_SNAPSHOT_MANIFEST", ZAKURA_MANIFEST)),
                       ("lightwalletd", os.environ.get("LIGHTWALLETD_SNAPSHOT_MANIFEST", LIGHTWALLETD_MANIFEST))):
         bootstrap(kind, root, url, chunk_bytes, reserve_bytes)
@@ -492,7 +521,7 @@ def main():
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         for process in list(CHILDREN):
             if process.poll() is None:
-                os.killpg(process.pid, signal.SIGTERM)
+                signal_group(process, signal.SIGTERM)
         for process in list(CHILDREN):
             stop(process)
         for thread in LOG_THREADS:
