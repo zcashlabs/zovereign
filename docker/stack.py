@@ -360,14 +360,15 @@ def grpc_bind_address():
 
 
 def grpc(method, data=None):
-    # The probe stays on loopback; external clients must validate the server certificate.
+    # Probe wildcard listeners over loopback; external clients must validate certificates.
     transport = "-insecure" if os.environ.get("TLS_CERT") else "-plaintext"
     args = ["grpcurl", transport, "-max-time", "5"]
     if data is not None:
         args.extend(["-d", json.dumps(data)])
     _, listener = grpc_bind_address()
-    loopback = "[::1]" if ":" in listener.hostname else "127.0.0.1"
-    args.extend([f"{loopback}:{listener.port}", f"cash.z.wallet.sdk.rpc.CompactTxStreamer/{method}"])
+    host = {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(listener.hostname, listener.hostname)
+    target = f"[{host}]:{listener.port}" if ":" in host else f"{host}:{listener.port}"
+    args.extend([target, f"cash.z.wallet.sdk.rpc.CompactTxStreamer/{method}"])
     return json.loads(command(args, capture=True, timeout=8, stderr=subprocess.DEVNULL))
 
 

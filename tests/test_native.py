@@ -83,6 +83,10 @@ class NativeTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(stack.grpc_bind_address()[0], "0.0.0.0:9067")
         for listener, probe in (("127.0.0.1:19067", "127.0.0.1:19067"),
+                                ("127.0.0.2:19067", "127.0.0.2:19067"),
+                                ("localhost:19067", "localhost:19067"),
+                                ("[::1]:19067", "[::1]:19067"),
+                                ("[::ffff:127.0.0.2]:19067", "[::ffff:127.0.0.2]:19067"),
                                 ("0.0.0.0:29067", "127.0.0.1:29067"),
                                 ("[::]:19067", "[::1]:19067")):
             with patch.dict(os.environ, {"GRPC_BIND_ADDR": listener}), \
