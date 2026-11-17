@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 use zovereign_core::{
-    manager::{LogMode, DEFAULT_IMAGE},
+    manager::{ImageSource, LogMode, DEFAULT_IMAGE},
     Manager, StateStore,
 };
 
@@ -42,6 +42,9 @@ enum Commands {
     Setup {
         #[arg(long,default_value=DEFAULT_IMAGE)]
         image: String,
+        /// Use a local/preloaded image without contacting its registry.
+        #[arg(long)]
+        local_image: bool,
         #[arg(long, default_value = "zovereign")]
         container: String,
         #[arg(long, default_value = "zovereign-data")]
@@ -187,6 +190,7 @@ fn run(cli: &Cli) -> Result<i32> {
                 } else {
                     Commands::Setup {
                         image: DEFAULT_IMAGE.into(),
+                        local_image: false,
                         container: "zovereign".into(),
                         volume: "zovereign-data".into(),
                         grpc_port: 9067,
@@ -203,13 +207,16 @@ fn dispatch(cli: &Cli, m: &Manager, command: &Commands) -> Result<i32> {
         Commands::Check => m.preflight()?,
         Commands::Setup {
             image,
+            local_image,
             container,
             volume,
             grpc_port,
             p2p_port,
         } => {
-            if m.store().load()?.is_none() && m.docker().inspect("container", container)?.is_some()
-            {
+            if m.store().load()?.is_some() {
+                bail!("Installation already configured; use start or status");
+            }
+            if m.docker().inspect("container", container)?.is_some() {
                 confirm(
                     "An existing container was found. Adopt it with its data and settings?",
                     cli,
@@ -224,10 +231,24 @@ fn dispatch(cli: &Cli, m: &Manager, command: &Commands) -> Result<i32> {
                     return Ok(1);
                 }
                 confirm("Install Zovereign? Initial setup downloads about 300 GB and needs a 1 TB SSD. Snapshot history depends on its publishers.",cli)?;
-                m.setup(image, container, volume, *grpc_port, *p2p_port)?
+                m.setup(
+                    image,
+                    if *local_image {
+                        ImageSource::Local
+                    } else {
+                        ImageSource::Registry
+                    },
+                    container,
+                    volume,
+                    *grpc_port,
+                    *p2p_port,
+                )?
             }
         }
         Commands::Adopt { container } => {
+            if m.store().load()?.is_some() {
+                bail!("An installation is already configured");
+            }
             confirm(
                 "Adopt this Zovereign installation without changing its runtime?",
                 cli,

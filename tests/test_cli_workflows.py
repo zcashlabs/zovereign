@@ -31,7 +31,7 @@ class Workflows(unittest.TestCase):
         import shutil
         shutil.rmtree(self.root/'config')
         s=self.state();s['containers']={};s['calls']=[];self.save(s)
-    def test_setup_creates_managed_installation_and_reuses_image(self):
+    def test_setup_creates_a_managed_installation(self):
         self.fresh_setup()
         self.cli('setup','--image','candidate','--yes')
         self.assertTrue(self.state()['containers']['replacement']['State']['Running'])
@@ -82,5 +82,91 @@ class Workflows(unittest.TestCase):
                 self.save(state)
                 self.cli('setup', '--image', 'candidate', '--yes')
                 self.assertTrue(self.state()['containers']['replacement']['State']['Running'])
+
+    def test_setup_rejects_unsupported_versions_before_creating_storage(self):
+        for key, value in (('ZAKURA_VERSION', '2.0.0'), ('ZAKURA_DB_MAJOR', '31'),
+                           ('LIGHTWALLETD_VERSION', 'v99.0.0')):
+            with self.subTest(key=key):
+                self.fresh_setup()
+                state = self.state()
+                state['images']['candidate']['Config']['Env'] = [
+                    f'{key}={value}' if item.startswith(key + '=') else item for item in ENV]
+                self.save(state)
+                self.cli('setup', '--image', 'candidate', '--yes', ok=False)
+                self.assertFalse((self.root / 'config/installation.json').exists())
+                self.assertFalse(any(call[0] == 'create' or call[:2] == ['volume', 'create']
+                                     for call in self.state()['calls']))
+
+    def test_adoption_rejects_unsupported_versions_without_changing_runtime(self):
+        import shutil
+        for key, value in (('ZAKURA_VERSION', '2.0.0'), ('ZAKURA_DB_MAJOR', '31'),
+                           ('LIGHTWALLETD_VERSION', 'v99.0.0')):
+            with self.subTest(key=key):
+                shutil.rmtree(self.root / 'config')
+                state = self.state()
+                state['containers']['original']['Config']['Env'] = [
+                    f'{key}={value}' if item.startswith(key + '=') else item for item in ENV]
+                self.save(state)
+                self.cli('adopt', '--yes', ok=False)
+                self.assertFalse((self.root / 'config/installation.json').exists())
+                self.assertTrue(self.state()['containers']['original']['State']['Running'])
+                self.assertFalse(any(call[0] in ('start', 'stop', 'rm', 'create')
+                                     for call in self.state()['calls']))
+
+    def test_setup_refreshes_a_cached_tag_and_pins_the_pulled_image(self):
+        self.fresh_setup()
+        state = self.state()
+        state['images']['candidate'] = copy.deepcopy(IMAGE)
+        fresh = copy.deepcopy(IMAGE)
+        fresh['Id'] = 'sha256:fresh'
+        state['registry_images'] = {'candidate': fresh}
+        self.save(state)
+        self.cli('setup', '--image', 'candidate', '--yes')
+        state = self.state()
+        self.assertIn(['pull', 'candidate'], state['calls'])
+        self.assertEqual(state['containers']['replacement']['Image'], 'sha256:fresh')
+        self.assertEqual(json.loads((self.root / 'config/installation.json').read_text())['image'],
+                         'sha256:fresh')
+        self.assertEqual(next(call for call in state['calls'] if call[0] == 'create')[-1],
+                         'sha256:fresh')
+
+    def test_setup_does_not_fall_back_to_cache_after_a_failed_pull(self):
+        self.fresh_setup()
+        state = self.state()
+        state['fail_pull'] = True
+        self.save(state)
+        self.cli('setup', '--image', 'candidate', '--yes', ok=False)
+        state = self.state()
+        self.assertIn(['pull', 'candidate'], state['calls'])
+        self.assertFalse(any(call[0] == 'create' or call[:2] == ['volume', 'create']
+                             for call in state['calls']))
+        self.assertFalse((self.root / 'config/installation.json').exists())
+
+    def test_setup_local_image_never_pulls_and_requires_a_cached_image(self):
+        self.fresh_setup()
+        state = self.state()
+        state['fail_pull'] = True
+        self.save(state)
+        self.cli('setup', '--local-image', '--image', 'candidate', '--yes')
+        self.assertFalse(any(call[0] == 'pull' for call in self.state()['calls']))
+        self.fresh_setup()
+        state = self.state()
+        del state['images']['candidate']
+        self.save(state)
+        self.cli('setup', '--local-image', '--image', 'candidate', '--yes', ok=False)
+        self.assertFalse(any(call[0] in ('pull', 'create') or call[:2] == ['volume', 'create']
+                             for call in self.state()['calls']))
+
+    def test_configured_setup_and_adoption_fail_before_confirmation(self):
+        record = (self.root / 'config/installation.json').read_bytes()
+        before = self.state()['calls']
+        for command in ('adopt', 'setup'):
+            with self.subTest(command=command):
+                result = self.cli(command, ok=False)
+                self.assertIn('already configured', json.loads(result.stdout)['error'])
+                self.assertNotIn('Run interactively', result.stdout)
+                self.assertNotIn('[y/N]', result.stderr)
+                self.assertEqual(self.state()['calls'], before)
+                self.assertEqual((self.root / 'config/installation.json').read_bytes(), record)
 
 if __name__=='__main__':unittest.main()

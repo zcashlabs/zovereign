@@ -56,13 +56,13 @@ def stop(process, grace=90):
     if process.poll() is None:
         try:
             os.killpg(process.pid, signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
+        except (ProcessLookupError, PermissionError) as signal_error:
             # A short-lived child can disappear after poll but before killpg.
             # Only ignore a signal error when wait proves the child has exited.
             try:
                 process.wait(timeout=0.1)
             except subprocess.TimeoutExpired:
-                raise
+                raise signal_error
         try:
             process.wait(timeout=grace)
         except subprocess.TimeoutExpired:

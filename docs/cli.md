@@ -32,6 +32,23 @@ extraction size or future chain growth. Runtime extraction reserves still apply.
 It does not install Docker, resize disks, open cloud firewalls or start a stopped
 Docker VM. Docker reports port conflicts at container start; existing data remains.
 
+Fresh setup pulls the requested registry reference even when it is cached,
+then records and creates the container from the resolved immutable image ID.
+A failed pull stops setup without falling back to the cached image. For a
+locally built or preloaded image, explicitly select local mode:
+
+```bash
+./target/debug/zovereign setup --local-image --image zovereign:local
+```
+
+Local mode never pulls and fails if the image is missing from the selected
+engine. Both modes enforce the same version and capacity checks. Setup and
+adoption currently support Zakura `1.8.7`, database major `30` and lightwalletd
+`v0.6.0`; other or incomplete version tuples are rejected. Update this policy
+alongside the bundled image after reviewing compatibility. The runtime validates
+Mainnet/archive mode and snapshot compatibility before serving compact blocks.
+Adoption preserves the existing container and never refreshes its image.
+
 After setup, `status --watch` follows snapshot progress and live node checkpoints.
 The published image predates structured status: rebuild the image with this
 checkout's `docker/stack.py` before expecting detailed progress. `logs` and
@@ -145,14 +162,15 @@ see [the manual CLI walkthrough](manual-cli.md).
 
 The host needs Python 3.9+ for the test harness, the Docker CLI, and a compiled
 CLI. The first run pulls a small, digest-pinned Python Alpine base image, then
-builds one local fixture image. Registry access is needed for that first
-base pull. Set `ZOVEREIGN_TEST_BINARY`
+builds supported and incompatible local fixture images. Registry access is
+needed for that first base pull. Set `ZOVEREIGN_TEST_BINARY`
 if your binary is outside `target/debug/zovereign`. Unset `ZOVEREIGN_DOCKER`
 and `FAKE_DOCKER_STATE`; the suite rejects fake-engine overrides.
 
 Coverage uses real Docker adoption (including setup's adoption path), health,
 stats, logs, connection settings, stop/start and durable volume identity.
-Adoption must preserve container identity, mounts and runtime settings.
+Adoption must preserve container identity, mounts and runtime settings, including
+when rejecting an unsupported database version.
 
 Each run has unique names and a run label. Cleanup inspects that label before
 removing only its own containers, volumes and images, including after failures.

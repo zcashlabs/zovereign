@@ -24,7 +24,14 @@ if a[:2] == ['container','inspect']:
     c = find(a[2]); finish([c] if c else None, None if c else 'No such container')
 if a[:2] == ['image','inspect']:
     i = s['images'].get(a[2]); finish([i] if i else None, None if i else 'No such image')
-if a[0] == 'pull': finish('pulled')
+if a[0] == 'pull':
+    if s.get('fail_pull'): finish(error='injected registry failure')
+    if a[1] in s.get('registry_images', {}):
+        import copy
+        image = s['registry_images'][a[1]]
+        s['images'][a[1]] = copy.deepcopy(image)
+        s['images'][image['Id']] = copy.deepcopy(image)
+    finish('pulled')
 if a[:2] == ['volume','create']: finish(a[2])
 if a[0] == 'run': finish({'free_bytes':s.get('free_bytes',800*1024**3),'cpu_compatible':True,'total_bytes':1024**4})
 if a[0] in ('start','stop'):
