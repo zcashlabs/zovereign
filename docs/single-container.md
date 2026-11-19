@@ -101,9 +101,11 @@ still downloads the complete snapshots and processes blocks after their tips.
 
 1. Initialize `/data`, acquire an exclusive volume lock, and drop to UID/GID
    `10001`. Bootstrap, Zakura, and lightwalletd run without root privileges.
-2. Fetch the latest mainnet **archive** entry from the Zakura manifest. Refuse
-   snapshots whose database major differs from the image's supported major
-   `30`.
+2. Fetch the Zakura manifest and select the mainnet **archive** with the highest
+   chain height whose database major matches the image's supported major `30`.
+   The publisher's `latest` entry can require a newer format; an older compatible
+   archive is used instead. Fail before downloading if no compatible archive is
+   listed. Check the selected entry's height, checksum, URL, and size before use.
 3. Pin the selected manifest in `/data/bootstrap/zakura.json`. Download using
    256 MiB HTTP ranges with three parallel connections and retries, checking
    returned range offsets and sizes. Ranges commit to the archive in order.
