@@ -194,6 +194,10 @@ for daily controls but currently need the documented manual image update.
 
 ## Verification
 
+Use the [VM test guide](testing/test-cli-on-a-vm.md) from a Linux guest, a Mac with a Docker VM,
+or a macOS/Linux workstation with a named remote Docker context. It covers small Docker fixtures
+and full Mainnet acceptance on a Linux engine with enough CPU, RAM and volume space.
+
 ```bash
 cargo fmt --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
@@ -270,9 +274,6 @@ or a fresh full-runtime installation. Production capacity checks stay enforced.
 Run the existing runtime image tests when changing the supervisor, then opt-in
 mainnet acceptance on a capable host with dedicated volumes before claiming a
 full restore. Never use a production volume for failure injection.
-
-See the [November 2026 bare-metal Mainnet test report](testing/2026-11-19-bare-metal-mainnet.md)
-for the combined CLI run on Ubuntu x86_64.
 
 ## Rust guidance
 
