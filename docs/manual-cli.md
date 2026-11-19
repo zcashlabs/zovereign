@@ -67,6 +67,7 @@ zv stats
 zv --stats
 zv logs --tail 50
 zv connect
+zv doctor
 zv --json status
 ```
 
@@ -76,12 +77,44 @@ survive stop/start while the start counter increases.
 
 ```sh
 zv stop
+zv agent --once
 zv status
 zv start
+zv repair --action restart
 ```
 
-While intentionally stopped, `health` returns a nonzero exit status. After
+While intentionally stopped, `health` returns a nonzero exit status and restart
+repair refuses recovery. The monitor must leave it stopped. After
 starting, wait until `health` reports ready before continuing.
+
+## Monitoring and native startup
+
+```sh
+zv startup disable
+zv startup enable
+zv startup render
+zv agent --once
+cat "$ZV_CONFIG/monitor.json"
+```
+
+The renderer selects the host OS automatically. For continuous monitoring, run
+`zv agent --interval 10` and stop it with Ctrl+C. The monitor only records status and never restarts the managed container.
+
+On a Linux systemd host or a macOS login session, optionally test installation:
+
+```sh
+zv startup install
+cat "$ZV_CONFIG/monitor.json"
+zv startup uninstall
+```
+
+Wait for `checked_at` to advance and verify a container status rather than an
+error. Only one OS monitor profile is installed per service scope; uninstall an
+existing profile before selecting another configuration. The monitor uses the
+installing account's Docker context/configuration and PATH. That account must
+already be able to access the engine and any remote credentials. Docker itself
+must start independently. On a host without a supported service manager, use its
+existing supervisor to run `zv agent`; daily Docker controls still work.
 
 Stop the manual deployment when finished with `zv stop`. Keep its volume to
 resume later. No global pruning or deployment-volume removal is part of this

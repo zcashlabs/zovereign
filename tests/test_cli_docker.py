@@ -15,6 +15,7 @@ import tempfile
 import time
 import unittest
 import uuid
+from cli_test_support import monitor_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = Path(os.environ.get("ZOVEREIGN_TEST_BINARY", ROOT / "target/debug/zovereign"))
@@ -188,17 +189,39 @@ class DockerIntegration(unittest.TestCase):
         self.assertIn("fixture_ready", self.cli("logs").stderr)
         binding = json.loads(self.cli("connect").stdout)["bindings"][0]
         self.assertEqual(binding, {"HostIp": "127.0.0.1", "HostPort": self.port})
+        self.assertTrue(json.loads(self.cli("doctor").stdout)["data_preserved"])
 
-    def test_start_stop_preserves_data_and_intent(self):
+    def test_start_stop_and_monitor_preserve_data_and_intent(self):
         starts = self.report()["starts"]
         self.cli("stop")
         self.assertFalse(self.inspect()["State"]["Running"])
         self.assertFalse(self.config()["desired_running"])
+        self.cli("agent", "--once")
+        self.cli("repair", "--yes", ok=False)
+        self.assertFalse(self.inspect()["State"]["Running"])
         self.cli("health", ok=False)
         self.cli("start")
         self.wait_ready()
         self.assert_persistent_identity("v1")
         self.assertGreater(self.report()["starts"], starts)
+
+    def test_monitor_can_find_real_docker_on_both_platforms(self):
+        for platform in ("linux", "macos"):
+            with self.subTest(platform=platform):
+                rendered = json.loads(self.cli("startup", "render", "--platform", platform).stdout)
+                # Service environments must retain Docker configuration even
+                # when HOME/PATH differ from the installing terminal.
+                environment = {**self.env, "HOME": str(Path(self.tmp.name) / "service-home"),
+                               "PATH": "", "DOCKER_CONFIG": str(Path(self.tmp.name) / "wrong-config"),
+                               **monitor_environment(rendered["template"], platform)}
+                result = subprocess.run([str(BINARY), "--config-dir", str(self.config_dir),
+                                         "agent", "--once"],
+                                        env=environment, text=True, capture_output=True, timeout=180)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                report = json.loads((self.config_dir / "monitor.json").read_text())
+                self.assertNotIn("error", report["status"], report)
+                self.assertTrue(report["status"]["runtime"]["test_fixture"])
+                self.assertEqual(self.inspect()["Id"], self.original["Id"])
 
     def test_unsupported_database_adoption_preserves_the_running_container(self):
         name = f"{self.name}-unsupported"

@@ -18,8 +18,9 @@ CONTRIBUTING.md, and docs/single-container.md first.
   lifecycle tests; small HTTP fixtures, no Zcash data. Pin the selected context
   and remove only this test run's labelled resources, never deployment volumes.
 - Keep public CLI/test commands independent of a Docker provider and user path.
-  Discover/select a context and preserve its identity; test nondefault
-  executable/config paths.
+  Discover/select a context, preserve its identity, and keep platform startup
+  adapters separate from shared lifecycle operations. Both service formats must
+  preserve the installer's Docker environment; test nondefault executable/config paths.
 
 - `docker/stack.py`: snapshot selection, range download, checksum verification,
   staged extraction, privilege dropping, supervision, and health probes.

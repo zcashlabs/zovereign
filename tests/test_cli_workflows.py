@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from cli_test_support import monitor_environment
 
 ROOT=Path(__file__).parents[1]
 BINARY=Path(os.environ.get('ZOVEREIGN_TEST_BINARY',ROOT/'target/debug/zovereign'))
@@ -72,9 +73,85 @@ class Workflows(unittest.TestCase):
         s=self.state();s['engine']='other';self.save(s)
         self.cli('stop',ok=False)
         self.assertTrue(self.state()['containers']['original']['State']['Running'])
+    def test_intentional_stop_is_not_undone_by_monitor(self):
+        self.cli('stop')
+        self.cli('agent','--once')
+        self.cli('repair','--yes',ok=False)
+        self.assertFalse(self.state()['containers']['original']['State']['Running'])
+        self.cli('start');self.assertTrue(self.state()['containers']['original']['State']['Running'])
+    def test_startup_template_handles_spaces(self):
+        r=self.cli('startup','render','--platform','linux');self.assertIn('agent',json.loads(r.stdout)['template'])
+    def test_monitor_finds_docker_from_installer_environment_on_both_platforms(self):
+        tools = self.root / 'tools & bins $25%'
+        tools.mkdir()
+        (tools / 'docker').symlink_to(ROOT / 'tests/fake_docker.py')
+        self.env.pop('ZOVEREIGN_DOCKER')
+        self.env['PATH'] = str(tools) + os.pathsep + self.env['PATH']
+        self.env['DOCKER_CONFIG'] = str(self.root / 'docker config & $25%')
+        for platform in ('linux', 'macos'):
+            with self.subTest(platform=platform):
+                rendered = json.loads(self.cli('startup', 'render', '--platform', platform).stdout)
+                recorded = monitor_environment(rendered['template'], platform)
+                self.assertEqual(recorded.get('DOCKER_CONFIG'), self.env['DOCKER_CONFIG'])
+                environment = {'HOME': os.environ['HOME'], 'PATH': '',
+                               'FAKE_DOCKER_STATE': str(self.path), **recorded}
+                result = subprocess.run([str(BINARY), '--config-dir', str(self.root / 'config'),
+                                         'agent', '--once'],
+                                        env=environment, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                report = json.loads((self.root / 'config/monitor.json').read_text())
+                self.assertNotIn('error', report['status'], report)
+                self.assertEqual(report['status']['state'], 'running')
 
+    def test_monitor_preserves_explicit_docker_executable(self):
+        for platform in ('linux', 'macos'):
+            with self.subTest(platform=platform):
+                rendered = json.loads(self.cli('startup', 'render', '--platform', platform).stdout)
+                recorded = monitor_environment(rendered['template'], platform)
+                self.assertEqual(recorded.get('ZOVEREIGN_DOCKER'), self.env['ZOVEREIGN_DOCKER'])
 
+    @unittest.skipUnless(os.uname().sysname == 'Linux', 'systemd installation adapter runs on Linux')
+    def test_linux_user_service_respects_xdg_config_home(self):
+        tools = self.root / 'service-tools'
+        tools.mkdir()
+        systemctl = tools / 'systemctl'
+        systemctl.write_text('#!/bin/sh\nexit 0\n')
+        systemctl.chmod(0o755)
+        self.env['PATH'] = str(tools) + os.pathsep + self.env['PATH']
+        self.env['XDG_CONFIG_HOME'] = str(self.root / 'custom-config')
+        result = json.loads(self.cli('startup', 'install', '--yes').stdout)
+        expected = self.root / 'custom-config/systemd/user/zovereign-monitor.service'
+        self.assertEqual(result['service_file'], str(expected))
+        self.assertTrue(expected.is_file())
+        self.cli('startup', 'uninstall', '--yes')
+        self.assertFalse(expected.exists())
 
+    def test_monitor_uninstall_does_not_recapture_installation_environment(self):
+        if os.uname().sysname != 'Linux':
+            self.skipTest('systemd installation adapter runs on Linux')
+        tools = self.root / 'service-tools'
+        tools.mkdir()
+        systemctl = tools / 'systemctl'
+        systemctl.write_text('#!/bin/sh\nexit 0\n')
+        systemctl.chmod(0o755)
+        self.env['PATH'] = str(tools) + os.pathsep + self.env['PATH']
+        self.env['XDG_CONFIG_HOME'] = str(self.root / 'custom-config')
+        self.cli('startup', 'install', '--yes')
+        # A custom executable override is no longer usable; removal still works.
+        self.env['ZOVEREIGN_DOCKER'] = ''
+        self.cli('startup', 'uninstall', '--yes')
+    @unittest.skipUnless(os.uname().sysname == 'Linux', 'systemd installation adapter runs on Linux')
+    def test_non_systemd_host_fails_before_writing_a_service(self):
+        tools = self.root / 'service-tools'
+        tools.mkdir()
+        systemctl = tools / 'systemctl'
+        systemctl.write_text('#!/bin/sh\nexit 1\n')
+        systemctl.chmod(0o755)
+        self.env['PATH'] = str(tools) + os.pathsep + self.env['PATH']
+        self.env['XDG_CONFIG_HOME'] = str(self.root / 'custom-config')
+        result = self.cli('startup', 'install', '--yes', ok=False)
+        self.assertIn('existing supervisor', json.loads(result.stdout)['error'])
+        self.assertFalse((self.root / 'custom-config/systemd').exists())
     def test_setup_supports_native_linux_architecture_names(self):
         for architecture in ('x86_64', 'amd64', 'aarch64', 'arm64'):
             with self.subTest(architecture=architecture):
@@ -84,6 +161,35 @@ class Workflows(unittest.TestCase):
                 self.save(state)
                 self.cli('setup', '--image', 'candidate', '--yes')
                 self.assertTrue(self.state()['containers']['replacement']['State']['Running'])
+    def test_monitor_identifies_missing_docker_executable_and_cause(self):
+        missing = self.root / 'missing-docker'
+        self.env['ZOVEREIGN_DOCKER'] = str(missing)
+        self.cli('agent', '--once')
+        report = json.loads((self.root / 'config/monitor.json').read_text())
+        self.assertIn(str(missing), report['status']['error'])
+        self.assertIn('os error 2', report['status']['error'])
+
+    def test_doctor_reports_errors_from_both_log_streams_without_mutating(self):
+        state = self.state()
+        state['log_stderr'] = 'CORRUPTION: compact-block cache needs recovery'
+        state['containers']['original']['State'].update(OOMKilled=True, Health={'Status': 'unhealthy'})
+        self.save(state)
+        report = json.loads(self.cli('doctor').stdout)
+        findings = ' '.join(report['findings'])
+        self.assertIn('Out of memory', findings)
+        self.assertIn('Health checks failed', findings)
+        self.assertIn('corruption', findings)
+        self.assertFalse(any(call[0] in ('stop', 'start', 'restart', 'rm') for call in self.state()['calls']))
+
+    def test_restart_repair_and_policy_controls_preserve_volume(self):
+        self.cli('startup', 'disable', '--yes')
+        self.assertEqual(self.state()['containers']['original']['HostConfig']['RestartPolicy']['Name'], 'no')
+        self.cli('startup', 'enable', '--yes')
+        self.cli('repair', '--action', 'restart', '--yes')
+        container = self.state()['containers']['original']
+        self.assertTrue(container['State']['Running'])
+        self.assertEqual(container['Mounts'][0]['Name'], 'zovereign-data')
+        self.assertFalse(any(call[:2] == ['volume', 'rm'] for call in self.state()['calls']))
 
     def test_setup_rejects_unsupported_versions_before_creating_storage(self):
         for key, value in (('ZAKURA_VERSION', '2.0.0'), ('ZAKURA_DB_MAJOR', '31'),

@@ -37,13 +37,15 @@ if a[0] == 'pull':
     finish('pulled')
 if a[:2] == ['volume','create']: finish(a[2])
 if a[0] == 'run': finish({'free_bytes':s.get('free_bytes',800*1024**3),'cpu_compatible':True,'total_bytes':1024**4})
-if a[0] in ('start','stop'):
+if a[0] in ('start','stop','restart'):
     c = find(a[-1])
     if s.get('fail_start') and a[0]=='start': finish(error='injected start failure')
     if not c: finish(error='No such container')
     c['State']['Running'] = a[0] != 'stop'
     c['State']['Status'] = 'running' if c['State']['Running'] else 'exited'
     finish(c['Id'])
+if a[0] == 'update':
+    c = find(a[-1]); c['HostConfig']['RestartPolicy']['Name'] = a[a.index('--restart')+1]; finish(c['Id'])
 if a[0] == 'create':
     import copy
     c = copy.deepcopy(next(iter(s['containers'].values()),s['template']))
@@ -56,6 +58,8 @@ if a[0] == 'exec':
     if a[-1] == 'health': finish('Healthy: compact block 120')
     if 'disk_usage' in a[-1]: finish({'free_bytes':800*1024**3,'cpu_compatible':True,'total_bytes':1024**4})
     finish({'phase':'ready','compact_block_height':120})
-if a[0] == 'logs': finish('retained databases')
+if a[0] == 'logs':
+    if s.get('log_stderr'): print(s['log_stderr'], file=sys.stderr)
+    finish(s.get('log_stdout', 'retained databases'))
 if a[0] == 'stats': finish({'CPUPerc':'4%','MemUsage':'1GiB / 16GiB'})
 finish(error='Unimplemented fake Docker command: '+repr(a))
