@@ -271,6 +271,9 @@ Run the existing runtime image tests when changing the supervisor, then opt-in
 mainnet acceptance on a capable host with dedicated volumes before claiming a
 full restore. Never use a production volume for failure injection.
 
+See the [November 2026 bare-metal Mainnet test report](testing/2026-11-19-bare-metal-mainnet.md)
+for the combined CLI run on Ubuntu x86_64.
+
 ## Rust guidance
 
 The workspace lint policy is adapted from
