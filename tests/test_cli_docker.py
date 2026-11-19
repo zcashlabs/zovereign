@@ -247,6 +247,34 @@ class DockerIntegration(unittest.TestCase):
         self.assertFalse(retained["State"]["Running"])
         self.assertEqual(retained["HostConfig"]["RestartPolicy"]["Name"], "no")
 
+    def test_unsupported_database_adoption_preserves_the_running_container(self):
+        name = f"{self.name}-unsupported"
+        volume = f"{name}-data"
+        self.docker("volume", "create", "--label", f"{RUN_LABEL}={self.run_id}", volume)
+        self.docker("run", "--detach", "--name", name,
+                    "--label", f"{RUN_LABEL}={self.run_id}",
+                    "--mount", f"type=volume,src={volume},dst=/data",
+                    self.images["incompatible"])
+        self.wait_ready(name)
+        before = self.inspect(name)
+        identity = self.docker("exec", name, "cat", "/data/identity.json").stdout
+        config = Path(self.tmp.name) / "unsupported-config"
+        result = self.cli("adopt", "--container", name, "--yes", config_dir=config, ok=False)
+        self.assertIn("Unsupported runtime versions", json.loads(result.stdout)["error"])
+        self.assertFalse((config / "installation.json").exists())
+        after = self.inspect(name)
+        self.assertEqual(after["Id"], before["Id"])
+        self.assertTrue(after["State"]["Running"])
+        self.assertEqual(self.docker("exec", name, "cat", "/data/identity.json").stdout, identity)
+
+    def test_missing_container_adoption_reports_absence(self):
+        config = Path(self.tmp.name) / "missing-container-config"
+        result = self.cli("adopt", "--container", f"{self.name}-missing", "--yes",
+                          config_dir=config, ok=False)
+        self.assertIn("Container does not exist", json.loads(result.stdout)["error"])
+        self.assertFalse((config / "installation.json").exists())
+        self.assertTrue(self.inspect()["State"]["Running"])
+
     def test_rollback_restores_original_container_and_data(self):
         self.update()
         replacement = self.inspect()["Id"]

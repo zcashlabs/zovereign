@@ -35,9 +35,10 @@ plus snapshots and peers for B.
 
 ## Prepare a clean checkout
 
-The public CLI and runtime fixes are on separate branches. This guide
-pins the CLI with managed updates to [PR 3](https://github.com/zcashlabs/zovereign/pull/11)
-and builds the Mainnet image from [PR 1's snapshot fix](https://github.com/zcashlabs/zovereign/pull/7).
+Build the CLI and the Mainnet image from the same checkout. The commands
+below fetch the head of [PR 3](https://github.com/zcashlabs/zovereign/pull/11)
+and record its exact commit in the reports directory. After the PR merges,
+use `refs/heads/main` to test the integrated branch.
 
 For a long SSH session you can open `tmux new-session -A -s zovereign-vm`
 and start Bash there. Use a fresh directory for each engine. The default is
@@ -49,10 +50,11 @@ reconnecting. Run each block separately and continue after it succeeds.
 vm_dir="${ZV_VM_TEST_DIR:-$HOME/zovereign-vm-test}"
 mkdir "$vm_dir" &&
   git init -q "$vm_dir/source" &&
-  git -C "$vm_dir/source" remote add origin https://github.com/viraj124/zovereign.git &&
-  git -C "$vm_dir/source" fetch --depth=1 origin 1ea110acd3e33f0a64fb41fca93fe46f4232a41e &&
+  git -C "$vm_dir/source" remote add origin https://github.com/zcashlabs/zovereign.git &&
+  git -C "$vm_dir/source" fetch --depth=1 origin refs/pull/11/head &&
   git -C "$vm_dir/source" switch --detach FETCH_HEAD &&
   mkdir "$vm_dir/reports" &&
+  git -C "$vm_dir/source" rev-parse HEAD > "$vm_dir/reports/source-commit.txt" &&
   cd "$vm_dir/source"
 ```
 
@@ -122,12 +124,10 @@ compatible with a passing fixture suite.
 
 ### 1. Build the runtime and check the actual data volume
 
-From `$vm_dir/source`, fetch the runtime revision. Create a run ID **once** in
-this fresh workspace. Keep it when reconnecting so you resume the same node.
+Create a run ID **once** in this fresh workspace. Keep it when reconnecting
+so you resume the same node.
 
 ```bash
-git fetch --depth=1 origin e5dabfb483baa343f0c58a9f507f207b5455b03c
-git worktree add --detach "$vm_dir/runtime" FETCH_HEAD
 date -u +zv-vm-%Y%m%dT%H%M%SZ > "$vm_dir/reports/run-id.txt"
 ```
 
@@ -155,9 +155,9 @@ mounting directories from your workstation.
 
 ```bash
 zv --json check | jq -e '.ready == true'
-zd build --load -t "$image" "$vm_dir/runtime"
+zd build --load -t "$image" "$vm_dir/source"
 zd run --rm -i --entrypoint python3 -e STACK_MODULE=/opt/zovereign/stack.py \
-  "$image" - -v < "$vm_dir/runtime/tests/test_stack.py" 2>&1 | tee "$reports/runtime-tests.log"
+  "$image" - -v < "$vm_dir/source/tests/test_stack.py" 2>&1 | tee "$reports/runtime-tests.log"
 ```
 
 ```bash
@@ -178,14 +178,14 @@ checks the CPU instructions exposed by the hypervisor.
 
 ### 2. Install, follow sync and query the wallet endpoint
 
-The pinned PR 3 CLI uses the local image when its tag is already present. Keep
-that unique tag throughout the run. The examples use host ports 19067 for gRPC
+Use `--local-image` to select the image built in step 1. Keep its unique tag
+throughout the run. The examples use host ports 19067 for gRPC
 (loopback only) and 18233 for peers. Choose unused ports on the Docker host.
 For a remote context, the wallet endpoint is on the VM's loopback. The gRPC
 probe below runs inside the container and works from all three setups.
 
 ```bash
-zv setup --image "$image" --container "$node" --volume "$volume" \
+zv setup --local-image --image "$image" --container "$node" --volume "$volume" \
   --grpc-port 19067 --p2p-port 18233
 zv status --watch
 ```
@@ -252,7 +252,7 @@ until the test ends so Docker can still resolve both image IDs.
 jq -e '.previous == null and .pending == null' "$vm_dir/profile/installation.json"
 zd inspect --format '{{.Id}} {{.Image}}' "$node" > "$reports/original-container.txt"
 markers > "$reports/original-markers.sha256"
-zd build --load --label "io.zovereign.test-candidate=$node" -t "$candidate" "$vm_dir/runtime"
+zd build --load --label "io.zovereign.test-candidate=$node" -t "$candidate" "$vm_dir/source"
 zd image inspect --format '{{.Id}}' "$image" "$candidate"
 zv --json update --check --local-image --image "$candidate" | jq -e '.available and .compatible'
 ```
@@ -422,7 +422,7 @@ For another supervisor, remove the test service through that supervisor.
 To pause the node and keep the chain for another session, run `zv stop`. To
 resume, run `zv start`. Keep the named volume, CLI profile, image tag and
 `reports/` directory. Record the CLI host OS/CPU, Docker engine OS/CPU and
-version, free volume space, and both source revisions. Report the fixture
+version, free volume space, and the commit in `reports/source-commit.txt`. Report the fixture
 and Mainnet outcomes separately. Include the two acceptance flags if you ran
 B, and the startup method and restart event if you ran step 6. Review reports
 for host names and peer details before sharing them.

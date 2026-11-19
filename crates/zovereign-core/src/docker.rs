@@ -25,6 +25,8 @@ impl Docker {
     }
     pub(crate) fn command(&self, args: &[String]) -> Command {
         let mut c = Command::new(&self.executable);
+        // Inspect errors are text; keep diagnostics independent of the host locale.
+        c.env("LC_ALL", "C").env("LANG", "C");
         if let Some(ctx) = &self.context {
             c.args(["--context", ctx]);
         }
@@ -91,7 +93,7 @@ impl Docker {
         let out = self.output(&s(&[kind, "inspect", id]))?;
         if !out.status.success() {
             let err = String::from_utf8_lossy(&out.stderr);
-            if err.contains("No such") || err.contains("not found") {
+            if is_missing_object(kind, &err) {
                 return Ok(None);
             }
             bail!("Docker inspection failed: {}", err.trim());
@@ -101,7 +103,59 @@ impl Docker {
             .next())
     }
 }
+
+fn is_missing_object(kind: &str, error: &str) -> bool {
+    let message = error.trim();
+    let message = message
+        .strip_prefix("Error response from daemon: ")
+        .or_else(|| message.strip_prefix("Error: "))
+        .unwrap_or(message);
+    // Context, SSH and socket failures can also contain "not found" or "No such".
+    // Unknown diagnostic formats must remain errors instead of implying absence.
+    [kind, "object"].into_iter().any(|object| {
+        let prefix = format!("No such {object}: ");
+        message.strip_prefix(prefix.as_str()).is_some_and(|name| {
+            !name.trim().is_empty() && !name.contains('\n') && !name.contains('\r')
+        })
+    })
+}
+
 /// Own a small list of command arguments for passing directly to Docker.
 pub fn s(args: &[&str]) -> Vec<String> {
     args.iter().map(|s| s.to_string()).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_missing_object;
+
+    #[test]
+    fn missing_objects_require_a_recognized_docker_diagnostic() {
+        for (kind, error) in [
+            ("container", "Error: No such container: zovereign"),
+            (
+                "image",
+                "Error response from daemon: No such image: example:latest",
+            ),
+            ("image", "Error: No such object: sha256:missing"),
+            ("container", "No such container: zovereign"),
+        ] {
+            assert!(is_missing_object(kind, error), "missing {kind}: {error}");
+        }
+        for error in [
+            "Docker context not found",
+            "Cannot connect: No such file or directory",
+            "SSH transport failed: No such image: example:latest",
+            "Error: No such image: ",
+            "Error: No such container: zovereign",
+            "Error: No such image: example:latest\nSSH connection failed",
+            "Error: image not found",
+            "Aucun objet de ce type",
+        ] {
+            assert!(
+                !is_missing_object("image", error),
+                "must retain error: {error}"
+            );
+        }
+    }
 }

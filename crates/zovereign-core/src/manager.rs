@@ -10,6 +10,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The published image selected by setup unless the caller chooses another.
 pub const DEFAULT_IMAGE: &str = "ghcr.io/zcashlabs/zovereign:latest";
+// Keep this approved runtime contract aligned with the root Dockerfile.
+const SUPPORTED_ZAKURA_VERSION: &str = "1.8.7";
+const SUPPORTED_DATABASE_MAJOR: &str = "30";
+const SUPPORTED_LIGHTWALLETD_VERSION: &str = "v0.6.0";
 const STATUS_SCRIPT: &str = "import json,pathlib,sys; sys.path.insert(0,'/opt/zovereign'); import stack; print(json.dumps(stack.status(pathlib.Path('/data'))) if hasattr(stack,'status') else json.dumps({'phase':'unknown','message':'This image predates structured status; use logs.'}))";
 const CAPACITY_SCRIPT: &str = "import json,shutil,pathlib,platform; d=shutil.disk_usage('/data'); c=pathlib.Path('/proc/cpuinfo').read_text(); print(json.dumps({'free_bytes':d.free,'total_bytes':d.total,'cpu_compatible':platform.machine() not in ('x86_64','amd64') or all(any(x==f for x in c.split()) for f in ('bmi2','adx'))}))";
 #[derive(Debug)]
@@ -28,7 +32,7 @@ pub enum LogMode {
     Follow,
 }
 
-/// Where a requested update image must be obtained.
+/// Where a requested runtime image must be obtained.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ImageSource {
@@ -123,6 +127,8 @@ impl Manager {
         )
     }
     /// Create and start the runtime after validating resources on the Docker host.
+    /// Registry mode refreshes the reference; local mode requires a cached image.
+    /// Both modes validate the supported versions and create by immutable image ID.
     ///
     /// # Errors
     ///
@@ -130,6 +136,7 @@ impl Manager {
     pub fn setup(
         &self,
         image: &str,
+        source: ImageSource,
         container: &str,
         volume: &str,
         grpc_port: u16,
@@ -163,13 +170,13 @@ impl Manager {
             bail!("Container {container} exists. Use 'zovereign adopt --container {container}' to preserve its settings.");
         }
 
-        if d.inspect("image", image)?.is_none() {
+        if source == ImageSource::Registry {
             d.stream(&s(&["pull", image]))?;
         }
         let image_info = d
             .inspect("image", image)?
-            .context("Image not found after pull")?;
-        compatibility(&image_info)?;
+            .context("Setup image unavailable on the selected Docker engine")?;
+        validate_supported_runtime(&image_info)?;
         let image_id = text(&image_info["Id"])?;
         d.run(&s(&["volume", "create", volume]))?;
 
@@ -711,6 +718,20 @@ pub(crate) fn compatibility(image: &Value) -> Result<Value> {
         json!({"zakura":e.get("ZAKURA_VERSION").context("Image is missing ZAKURA_VERSION")?,"database_major":e.get("ZAKURA_DB_MAJOR").context("Image is missing ZAKURA_DB_MAJOR")?,"lightwalletd":e.get("LIGHTWALLETD_VERSION").context("Image is missing LIGHTWALLETD_VERSION")?}),
     )
 }
+
+fn validate_supported_runtime(image: &Value) -> Result<()> {
+    let declared = compatibility(image)?;
+    let supported = json!({
+        "zakura": SUPPORTED_ZAKURA_VERSION,
+        "database_major": SUPPORTED_DATABASE_MAJOR,
+        "lightwalletd": SUPPORTED_LIGHTWALLETD_VERSION,
+    });
+    if declared != supported {
+        bail!("Unsupported runtime versions: {declared}; this CLI supports {supported}");
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_installation(i: &Value) -> Result<String> {
     let entry = i["Config"]["Entrypoint"]
         .as_array()
@@ -718,7 +739,7 @@ pub(crate) fn validate_installation(i: &Value) -> Result<String> {
     if !entry.iter().any(|x| x == "/opt/zovereign/stack.py") {
         bail!("Container is not the combined Zovereign runtime");
     }
-    compatibility(i)?;
+    validate_supported_runtime(i)?;
     let e = environment(i);
     if e.get("DATA_DIR").map(String::as_str).unwrap_or("/data") != "/data" {
         bail!("Custom DATA_DIR is not supported by this CLI yet");
@@ -1009,17 +1030,41 @@ mod tests {
         assert!(validate_installation(&i).is_err());
     }
     #[test]
-    fn compatibility_fails_closed() {
-        let mut newer = image();
-        newer["Config"]["Env"] = json!([
-            "ZAKURA_VERSION=1.8.7",
-            "ZAKURA_DB_MAJOR=31",
-            "LIGHTWALLETD_VERSION=v0.6.0"
-        ]);
-        assert_ne!(
-            compatibility(&image()).unwrap(),
-            compatibility(&newer).unwrap()
-        );
-        assert!(compatibility(&json!({})).is_err());
+    fn runtime_versions_must_match_the_supported_contract() {
+        assert!(validate_supported_runtime(&image()).is_ok());
+        for (key, value) in [
+            ("ZAKURA_VERSION", "2.0.0"),
+            ("ZAKURA_DB_MAJOR", "31"),
+            ("LIGHTWALLETD_VERSION", "v99.0.0"),
+            ("ZAKURA_VERSION", ""),
+        ] {
+            let mut unsupported = image();
+            let env = unsupported["Config"]["Env"].as_array_mut().unwrap();
+            for entry in env {
+                if entry.as_str().unwrap().starts_with(&format!("{key}=")) {
+                    *entry = json!(format!("{key}={value}"));
+                }
+            }
+            assert!(
+                validate_supported_runtime(&unsupported).is_err(),
+                "unsupported {key}={value} must be rejected"
+            );
+        }
+        assert!(validate_supported_runtime(&json!({})).is_err());
+    }
+
+    #[test]
+    fn approved_versions_match_the_bundled_runtime() {
+        let dockerfile = include_str!("../../../Dockerfile");
+        for (key, value) in [
+            ("ZAKURA_VERSION", SUPPORTED_ZAKURA_VERSION),
+            ("ZAKURA_DB_MAJOR", SUPPORTED_DATABASE_MAJOR),
+            ("LIGHTWALLETD_VERSION", SUPPORTED_LIGHTWALLETD_VERSION),
+        ] {
+            assert!(
+                dockerfile.contains(&format!("{key}={value}")),
+                "review the CLI compatibility policy when changing Dockerfile {key}"
+            );
+        }
     }
 }

@@ -56,13 +56,13 @@ def stop(process, grace=90):
     if process.poll() is None:
         try:
             os.killpg(process.pid, signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
+        except (ProcessLookupError, PermissionError) as signal_error:
             # A short-lived child can disappear after poll but before killpg.
             # Only ignore a signal error when wait proves the child has exited.
             try:
                 process.wait(timeout=0.1)
             except subprocess.TimeoutExpired:
-                raise
+                raise signal_error
         try:
             process.wait(timeout=grace)
         except subprocess.TimeoutExpired:
@@ -159,10 +159,19 @@ def choose_snapshot(kind, manifest_url):
     if kind == "zakura":
         if not isinstance(manifest, list):
             raise StackError("Zakura manifest must contain a snapshot list")
-        item = next((item.copy() for item in manifest if item.get("network") == "mainnet"
-                     and item.get("snapshot_kind") == "archive" and "latest" in item.get("roles", [])), None)
-        if item is None:
-            raise StackError("No latest mainnet archive in the Zakura manifest")
+        supported_major = int(os.environ.get("ZAKURA_DB_MAJOR", "30"))
+        candidates = [entry for entry in manifest if isinstance(entry, dict)
+                      and entry.get("network") == "mainnet"
+                      and entry.get("snapshot_kind") == "archive"
+                      and entry.get("db_major") == supported_major]
+        if not candidates:
+            raise StackError(
+                f"No compatible mainnet archive for database major {supported_major} in the Zakura manifest; "
+                "use a compatible snapshot catalog or a reviewed runtime upgrade")
+        # A publisher's latest archive can require a newer database format.
+        # Rank compatible entries by chain height rather than catalog order or roles.
+        item = max(candidates, key=lambda entry: positive_int(
+            entry.get("height"), "Zakura snapshot height", minimum=0)).copy()
         item["size"] = item.get("size_bytes")
     else:
         if not isinstance(manifest, dict) or manifest.get("format_version") != 1:
@@ -170,6 +179,8 @@ def choose_snapshot(kind, manifest_url):
         item = manifest.copy()
         item["url"] = item.get("snapshot_url")
     validate_snapshot(kind, item)
+    if kind == "zakura":
+        log(f"Selected Zakura mainnet archive at height {item['height']} for database major {item['db_major']}")
     item["manifest_url"] = manifest_url
     return item
 

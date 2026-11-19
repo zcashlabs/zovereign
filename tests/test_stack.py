@@ -99,7 +99,7 @@ def fixtures(server):
                     "state/v30/mainnet/MANIFEST-000001": b"manifest",
                     "state/v30/mainnet/000001.sst": os.urandom(8192)})
     light = archive({"./db/main/blocks": os.urandom(8192), "./db/main/lengths": b"lengths"})
-    node_info = {"network": "mainnet", "snapshot_kind": "archive", "roles": ["latest"],
+    node_info = {"network": "mainnet", "snapshot_kind": "archive", "roles": ["latest"], "height": 100,
                  "zakura_version": "1.8.7", "db_major": 30, "size_bytes": len(node),
                  "sha256": hashlib.sha256(node).hexdigest(), "url": server["url"] + "/node.tar.zst"}
     light_info = {"format_version": 1, "network": "mainnet", "lightwalletd_version": "v0.6.0",
@@ -118,6 +118,90 @@ class BootstrapTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary.cleanup()
+
+    def test_selects_highest_compatible_archive_from_mixed_catalog(self):
+        with publisher() as server:
+            fixtures(server)
+            item = json.loads(server["files"]["/node.json"])[0]
+            older = {**item, "roles": ["monthly"], "height": "9",
+                     "url": server["url"] + "/older.tar.zst"}
+            newest = {**item, "roles": ["daily"], "height": "100"}
+            incompatible = {**item, "db_major": 31, "zakura_version": "1.8.9", "height": 200}
+            other_network = {**item, "network": "testnet", "height": 300}
+            pruned = {**item, "snapshot_kind": "pruned", "height": 400}
+            server["files"]["/node.json"] = json.dumps(
+                [older, incompatible, None, newest, other_network, pruned]).encode()
+
+            selected = stack.choose_snapshot("zakura", server["url"] + "/node.json")
+
+            self.assertEqual(selected["url"], newest["url"])
+            self.assertEqual(selected["height"], newest["height"])
+            self.assertEqual(selected["manifest_url"], server["url"] + "/node.json")
+            self.assertEqual(server["requests"], [("/node.json", None)])
+
+    def test_bootstrap_restores_compatible_fallback_and_reuses_it_offline(self):
+        with publisher() as server:
+            fixtures(server)
+            item = json.loads(server["files"]["/node.json"])[0]
+            compatible = {**item, "roles": ["daily"], "zakura_version": "1.7.0"}
+            incompatible = {**item, "db_major": 31, "zakura_version": "1.8.9", "height": 200,
+                            "url": server["url"] + "/incompatible.tar.zst"}
+            server["files"]["/node.json"] = json.dumps([incompatible, compatible]).encode()
+
+            stack.bootstrap("zakura", self.root, server["url"] + "/node.json", 2048, 0)
+
+            marker = json.loads((self.root / "zakura/.bootstrap.json").read_text())
+            self.assertEqual(marker["url"], compatible["url"])
+            self.assertEqual(marker["zakura_version"], "1.7.0")
+            self.assertEqual(marker["db_major"], 30)
+            self.assertTrue(stack.valid_database("zakura", self.root / "zakura"))
+            self.assertFalse(any(path == "/incompatible.tar.zst" for path, _ in server["requests"]))
+
+            requests = list(server["requests"])
+            server["fail"] = True
+            stack.bootstrap("zakura", self.root, server["url"] + "/node.json", 2048, 0)
+            self.assertEqual(server["requests"], requests)
+
+    def test_no_compatible_archive_fails_before_pinning_or_downloading(self):
+        with publisher() as server:
+            fixtures(server)
+            item = json.loads(server["files"]["/node.json"])[0]
+            server["files"]["/node.json"] = json.dumps([
+                {**item, "db_major": 31},
+                {**item, "network": "testnet"},
+                {**item, "snapshot_kind": "pruned"},
+                None,
+            ]).encode()
+
+            with self.assertRaisesRegex(stack.StackError, "No compatible mainnet archive.*database major 30"):
+                stack.bootstrap("zakura", self.root, server["url"] + "/node.json", 2048, 0)
+
+            self.assertEqual(server["requests"], [("/node.json", None)])
+            self.assertFalse((self.root / "bootstrap/zakura.json").exists())
+            self.assertFalse((self.root / "bootstrap/zakura.tar.zst.part").exists())
+            self.assertFalse((self.root / "zakura").exists())
+
+    def test_selected_compatible_archive_still_requires_valid_metadata(self):
+        with publisher() as server:
+            fixtures(server)
+            item = json.loads(server["files"]["/node.json"])[0]
+            older = {**item, "roles": ["monthly"], "height": 90}
+            for field, value, error in (
+                ("height", None, "snapshot height"),
+                ("height", -1, "snapshot height"),
+                ("height", True, "snapshot height"),
+                ("height", "invalid", "snapshot height"),
+                ("sha256", "invalid", "SHA-256"),
+                ("url", "file:///tmp/snapshot", "HTTP or HTTPS"),
+                ("size_bytes", 0, "snapshot size"),
+            ):
+                with self.subTest(field=field, value=value):
+                    invalid = {**item, "roles": ["daily"], field: value}
+                    server["files"]["/node.json"] = json.dumps([older, invalid]).encode()
+                    with self.assertRaisesRegex(stack.StackError, error):
+                        stack.choose_snapshot("zakura", server["url"] + "/node.json")
+
+            self.assertTrue(all(path == "/node.json" for path, _ in server["requests"]))
 
     def test_both_snapshots_restore_and_restart_offline(self):
         with publisher() as server:

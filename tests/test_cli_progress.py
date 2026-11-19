@@ -26,13 +26,16 @@ class ProgressTests(unittest.TestCase):
         with patch.object(stack.os, 'killpg', side_effect=PermissionError('exited')):
             stack.stop(child)
         child.wait.assert_any_call(timeout=0.1)
-    def test_cleanup_does_not_ignore_signal_failure_for_live_child(self):
-        child = Mock(pid=9999)
-        child.poll.return_value = None
-        child.wait.side_effect = stack.subprocess.TimeoutExpired('child', 0.1)
-        with patch.object(stack.os, 'killpg', side_effect=PermissionError('live')):
-            with self.assertRaises(stack.subprocess.TimeoutExpired):
-                stack.stop(child)
+    def test_cleanup_preserves_the_original_signal_error_for_a_live_child(self):
+        for error in (PermissionError('live'), ProcessLookupError('live')):
+            with self.subTest(error=type(error).__name__):
+                child = Mock(pid=9999)
+                child.poll.return_value = None
+                child.wait.side_effect = stack.subprocess.TimeoutExpired('child', 0.1)
+                with patch.object(stack.os, 'killpg', side_effect=error):
+                    with self.assertRaises(type(error)) as caught:
+                        stack.stop(child)
+                self.assertIs(caught.exception, error)
     def test_atomic_progress_and_live_node_checkpoint(self):
         stack.progress('downloading', 'zakura', completed_bytes=128, total_bytes=256)
         before = (self.root / 'status.json').read_bytes()
