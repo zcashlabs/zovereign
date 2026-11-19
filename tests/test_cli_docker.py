@@ -47,7 +47,7 @@ class DockerIntegration(unittest.TestCase):
             raise RuntimeError("The integration fixtures require a Linux Docker engine")
         cls.run_id = uuid.uuid4().hex[:12]
         cls.prefix = f"zovereign-it-{cls.run_id}"
-        cls.images = {version: f"{cls.prefix}:{version}" for version in ("v1",)}
+        cls.images = {version: f"{cls.prefix}:{version}" for version in ("v1", "incompatible")}
         cls.addClassCleanup(cls.cleanup_resources)
         print(f"\nReal Docker context: {cls.context}; fixture prefix: {cls.prefix}", file=sys.stderr)
         for version, image in cls.images.items():
@@ -55,7 +55,7 @@ class DockerIntegration(unittest.TestCase):
             cls.docker("build", "--tag", image,
                        "--label", f"{RUN_LABEL}={cls.run_id}",
                        "--build-arg", f"FIXTURE_REVISION={version}",
-                       "--build-arg", "FIXTURE_DB_MAJOR=30",
+                       "--build-arg", f"FIXTURE_DB_MAJOR={31 if version == 'incompatible' else 30}",
                        str(ROOT / "tests/docker_fixture"), timeout=600)
 
     @classmethod
@@ -222,6 +222,35 @@ class DockerIntegration(unittest.TestCase):
                 self.assertNotIn("error", report["status"], report)
                 self.assertTrue(report["status"]["runtime"]["test_fixture"])
                 self.assertEqual(self.inspect()["Id"], self.original["Id"])
+
+    def test_unsupported_database_adoption_preserves_the_running_container(self):
+        name = f"{self.name}-unsupported"
+        volume = f"{name}-data"
+        self.docker("volume", "create", "--label", f"{RUN_LABEL}={self.run_id}", volume)
+        self.docker("run", "--detach", "--name", name,
+                    "--label", f"{RUN_LABEL}={self.run_id}",
+                    "--mount", f"type=volume,src={volume},dst=/data",
+                    self.images["incompatible"])
+        self.wait_ready(name)
+        before = self.inspect(name)
+        identity = self.docker("exec", name, "cat", "/data/identity.json").stdout
+        config = Path(self.tmp.name) / "unsupported-config"
+        result = self.cli("adopt", "--container", name, "--yes", config_dir=config, ok=False)
+        self.assertIn("Unsupported runtime versions", json.loads(result.stdout)["error"])
+        self.assertFalse((config / "installation.json").exists())
+        after = self.inspect(name)
+        self.assertEqual(after["Id"], before["Id"])
+        self.assertTrue(after["State"]["Running"])
+        self.assertEqual(self.docker("exec", name, "cat", "/data/identity.json").stdout, identity)
+
+    def test_missing_container_adoption_reports_absence(self):
+        config = Path(self.tmp.name) / "missing-container-config"
+        result = self.cli("adopt", "--container", f"{self.name}-missing", "--yes",
+                          config_dir=config, ok=False)
+        self.assertIn("Container does not exist", json.loads(result.stdout)["error"])
+        self.assertFalse((config / "installation.json").exists())
+        self.assertTrue(self.inspect()["State"]["Running"])
+
 
 
 

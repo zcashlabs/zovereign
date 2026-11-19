@@ -9,6 +9,7 @@ s = json.loads(p.read_text())
 a = sys.argv[1:]
 if a[:1] == ['--context']: a = a[2:]
 s.setdefault('calls', []).append(a)
+s.setdefault('locales', []).append({key: os.environ.get(key) for key in ('LANG', 'LC_ALL')})
 def finish(value=None, error=None):
     p.write_text(json.dumps(s))
     if error:
@@ -21,10 +22,19 @@ def find(name):
 if a == ['context','show']: finish('fake-vm')
 if a[0] == 'info': finish({'ID':s.get('engine','vm-1'),'OSType':'linux','Architecture':s.get('arch','aarch64'),'NCPU':4,'MemTotal':s.get('memory',16*1024**3)})
 if a[:2] == ['container','inspect']:
-    c = find(a[2]); finish([c] if c else None, None if c else 'No such container')
+    if s.get('inspect_errors', {}).get('container'): finish(error=s['inspect_errors']['container'])
+    c = find(a[2]); finish([c] if c else None, None if c else f'Error: No such container: {a[2]}')
 if a[:2] == ['image','inspect']:
-    i = s['images'].get(a[2]); finish([i] if i else None, None if i else 'No such image')
-if a[0] == 'pull': finish('pulled')
+    if s.get('inspect_errors', {}).get('image'): finish(error=s['inspect_errors']['image'])
+    i = s['images'].get(a[2]); finish([i] if i else None, None if i else f'Error response from daemon: No such image: {a[2]}')
+if a[0] == 'pull':
+    if s.get('fail_pull'): finish(error='injected registry failure')
+    if a[1] in s.get('registry_images', {}):
+        import copy
+        image = s['registry_images'][a[1]]
+        s['images'][a[1]] = copy.deepcopy(image)
+        s['images'][image['Id']] = copy.deepcopy(image)
+    finish('pulled')
 if a[:2] == ['volume','create']: finish(a[2])
 if a[0] == 'run': finish({'free_bytes':s.get('free_bytes',800*1024**3),'cpu_compatible':True,'total_bytes':1024**4})
 if a[0] in ('start','stop','restart'):
