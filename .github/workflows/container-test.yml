@@ -82,6 +82,14 @@ jobs:
             -e STACK_MODULE=/opt/zovereign/stack.py \
             --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/tests,readonly" \
             "zovereign:ci-$ARCH" /tests/test_stack.py
+      - name: Verify structured runtime progress
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          docker run --rm --platform "linux/$ARCH" --entrypoint python3 \
+            -e STACK_MODULE=/opt/zovereign/stack.py \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/tests,readonly" \
+            "zovereign:ci-$ARCH" /tests/test_cli_progress.py
       - name: Export tested image
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:

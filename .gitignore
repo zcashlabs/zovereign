@@ -21,3 +21,6 @@ __pycache__/
 data/
 output/
 mainnet-validation*.json
+
+# Rust host CLI build artifacts.
+/target/
