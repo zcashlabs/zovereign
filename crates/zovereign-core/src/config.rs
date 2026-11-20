@@ -2,6 +2,7 @@
 use crate::{error::bail, Result};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{
     fs::{self, File, OpenOptions},
     io::Write,
@@ -11,7 +12,7 @@ use std::{
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
-/// Durable identity and desired state for one installation.
+/// Durable identity, desired state and recovery information for one installation.
 pub struct Config {
     /// The version of the installation record format.
     pub schema_version: u32,
@@ -27,7 +28,51 @@ pub struct Config {
     pub image: String,
     /// Whether the user intends the runtime to remain running.
     pub desired_running: bool,
+    /// The retained predecessor of a replacement runtime.
+    pub previous: Option<Previous>,
+    /// The last unfinished image-replacement operation.
+    pub pending: Option<Pending>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
+/// A retained container that can restore the previous compatible runtime.
+pub struct Previous {
+    /// The retained predecessor container ID.
+    pub container_id: String,
+    /// The immutable predecessor image ID.
+    pub image_id: String,
+    /// The exact bundled-version and database contract.
+    pub compatibility: Value,
+    /// The original restart policy restored on rollback.
+    pub restart_policy: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
+/// The durable journal of an image replacement that may need recovery.
+pub struct Pending {
+    /// The last successfully journaled transition.
+    pub stage: UpdateStage,
+    /// The container retained for recovery.
+    pub old_id: String,
+    /// The replacement image ID.
+    pub new_image: String,
+    /// Whether the original container was running when the update started.
+    pub was_running: bool,
+}
+
+/// The last durable transition of an interrupted image replacement.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum UpdateStage {
+    /// The previous container and target image were recorded before shutdown.
+    Prepared,
+    /// The stopped previous container was renamed and retained.
+    OldRetained,
+    /// The replacement exists and may need to be started or rolled back.
+    ReplacementCreated,
+}
+
 #[derive(Debug)]
 /// Reads and durably writes installation records under one configuration directory.
 pub struct StateStore {
@@ -162,6 +207,25 @@ pub(crate) fn valid_name(name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn update_stages_preserve_the_existing_wire_format_and_reject_unknown_states() {
+        let stage: UpdateStage = serde_json::from_str("\"old_retained\"")
+            .expect("existing journal stage must remain readable");
+        assert_eq!(
+            stage,
+            UpdateStage::OldRetained,
+            "existing recovery journals must keep their meaning"
+        );
+        assert_eq!(
+            serde_json::to_string(&stage).expect("stage serializes"),
+            "\"old_retained\"",
+            "wire format must remain stable"
+        );
+        assert!(
+            serde_json::from_str::<UpdateStage>("\"partially_migrated\"").is_err(),
+            "unrecognized recovery states must fail validation"
+        );
+    }
     #[test]
     fn invalid_names_return_errors_without_panicking() {
         for name in ["", "-option", "name/with/path", "name with spaces"] {

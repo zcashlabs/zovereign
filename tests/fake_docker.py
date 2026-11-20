@@ -46,7 +46,10 @@ if a[0] in ('start','stop','restart'):
     finish(c['Id'])
 if a[0] == 'update':
     c = find(a[-1]); c['HostConfig']['RestartPolicy']['Name'] = a[a.index('--restart')+1]; finish(c['Id'])
+if a[0] == 'rename':
+    c = find(a[1]); c['Name'] = '/' + a[2]; finish('')
 if a[0] == 'create':
+    if s.get('fail_create'): finish(error='injected creation failure')
     import copy
     c = copy.deepcopy(next(iter(s['containers'].values()),s['template']))
     c.update(Id='replacement', Name='/'+a[a.index('--name')+1], Image=a[-1])
@@ -62,4 +65,6 @@ if a[0] == 'logs':
     if s.get('log_stderr'): print(s['log_stderr'], file=sys.stderr)
     finish(s.get('log_stdout', 'retained databases'))
 if a[0] == 'stats': finish({'CPUPerc':'4%','MemUsage':'1GiB / 16GiB'})
+if a[0] == 'rm':
+    c=find(a[-1]); del s['containers'][c['Id']]; finish('removed container only')
 finish(error='Unimplemented fake Docker command: '+repr(a))

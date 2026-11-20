@@ -10,8 +10,8 @@ runtime remains responsible for snapshots and the two node processes.
 
 Requires Rust 1.89+ to build, and the Docker CLI with access to a running Linux
 Docker engine to operate the stack. Compose, Node.js, Python and Rust are not
-required on an end user's host when using a prebuilt CLI binary. The runtime
-image contains its own Python.
+required on an end user's host when using a prebuilt CLI binary. The optional
+release monitor needs curl. The runtime image contains its own Python.
 
 ```bash
 cargo build --locked
@@ -67,6 +67,10 @@ zovereign logs --follow
 zovereign connect
 zovereign doctor
 zovereign repair --action restart
+zovereign update --check
+zovereign update                   # also --update
+zovereign update --accept          # after the new runtime is healthy
+zovereign update --rollback
 ```
 
 `--json` returns structured results/errors on stdout. Watch commands emit one
@@ -79,12 +83,12 @@ start services or change the bootstrap state.
 
 State lives in `$XDG_CONFIG_HOME/zovereign` or `~/.config/zovereign`; override with
 `--config-dir` or `ZOVEREIGN_CONFIG_DIR`. `installation.json` records the Docker
-context/engine identity, volume, image and desired running state. Mutations
-acquire an exclusive file lock. The CLI never removes a database volume.
-Setup uses Docker's `unless-stopped` policy; the Docker engine must already
-be running. Managed updates are planned for the following change. Use the
-existing manual update procedure in
-[the runtime guide](single-container.md#updating-a-published-image) for now.
+context/engine identity, volume, desired running state and update journal.
+Mutations acquire an exclusive file lock. The CLI never removes a database
+volume. Restart repair requires confirmation and respects an intentional stop.
+`doctor` surfaces low space, OOM, pending updates, unhealthy service checks and
+recent lightwalletd corruption reports; it does not prove database integrity.
+Database rebuilds, data migration and destructive repair remain manual.
 
 ## VM and operating system support
 
@@ -124,7 +128,7 @@ zovereign startup install          # systemd user service / macOS login agent
 zovereign startup uninstall
 # Linux system service, when running as an administrator:
 sudo /absolute/path/to/zovereign --config-dir /absolute/config startup install --system
-zovereign agent --once
+zovereign agent --once --no-update-check
 ```
 
 Install/copy the CLI to a permanent path before installing its monitor. Both
@@ -167,7 +171,10 @@ underlying OS error. The saved engine/context remain in use when the shell's
 default context changes. `startup enable` configures the container's restart
 policy on any supported Docker engine and does not require systemd or launchd.
 
-The monitor records health in `monitor.json` without contacting release services.
+The monitor records health in `monitor.json` and checks GitHub releases daily with
+bounded HTTP timeouts. Cached release notices appear on subsequent interactive
+commands. Unknown release/source revisions are not reported as proven upgrades.
+Use `agent --no-update-check` for offline installations. No telemetry is sent.
 
 Docker alone restarts failed containers. The monitor never restarts stopped or
 unhealthy containers, so it cannot fight an update, repair or intentional stop.
@@ -176,14 +183,37 @@ lingering for unattended operation; use the explicit system service for a
 suitable Linux server. macOS Docker VMs/login agents generally start after login.
 Non-systemd VMs can use their existing supervisor to run `zovereign agent`.
 
-## Diagnosis and safe recovery
+## Update contract and recovery
 
-`doctor` reports low disk space, OOM, unhealthy services and recent lightwalletd
-corruption messages. It does not prove database integrity. Restart repair asks
-for confirmation and refuses an intentional stop; use `start` explicitly to
-resume. Database rebuilds and destructive repairs remain manual.
+Updates pull a candidate image, then compare the bundled Zakura version, database
+major and lightwalletd version. This first implementation only replaces images
+with the exact same tuple. A new bundled version needs an explicit reviewed
+migration path; changing environment version strings is not a migration.
+Use `update --local-image --image IMAGE` (also with `--check`) for an image
+already built or loaded on the selected engine. This skips the registry pull;
+the same compatibility and settings checks still apply. A missing image fails
+before the running container is stopped.
+
+The old container is stopped, its automatic restart disabled, and it is renamed
+and retained. The replacement attaches the same volume. The journal is saved
+before every destructive container transition; a failed create can be recovered
+with `repair --action rollback`. A new image is not accepted automatically:
+check `health`, then `update --accept`. Acceptance removes only the old stopped
+container, never its data volume. Updates of intentionally stopped installations
+leave the replacement stopped. Failed replacement containers are also retained
+for diagnosis after rollback. Remove them explicitly after review.
+
+Ports, TLS mounts, environment overrides, labels and log options are preserved
+for supported Docker configurations. Adoption itself changes no runtime options.
+Updates refuse unsupported custom networks/resource settings/entrypoints before
+stopping services. Compose deployments using a custom network can be adopted
+for daily controls but currently need the documented manual image update.
 
 ## Verification
+
+Use the [VM test guide](testing/test-cli-on-a-vm.md) from a Linux guest, a Mac with a Docker VM,
+or a macOS/Linux workstation with a named remote Docker context. It covers small Docker fixtures
+and full Mainnet acceptance on a Linux engine with enough CPU, RAM and volume space.
 
 ```bash
 cargo fmt --check
@@ -194,10 +224,11 @@ cargo build --locked
 python3 -m unittest discover -s tests -p 'test_cli_*.py' -v
 ```
 
-The default suite uses a fake Docker boundary for deterministic setup failures,
-capacity gates, adoption, engine identity and structured progress. Real-Docker
-tests are skipped unless explicitly enabled; an enabled test fails when its
-binary or engine is unavailable.
+The default suite uses a fake Docker boundary and covers argument parsing, adoption, engine identity changes, intentional
+stops, compatibility rejection before shutdown, retained-container rollback,
+interrupted update recovery, TLS/settings preservation and structured progress.
+The real-Docker tests below are skipped unless explicitly enabled. When enabled,
+a missing CLI or unavailable engine fails the suite rather than skipping it.
 
 ### Real Docker management integration
 
@@ -233,15 +264,20 @@ see [the manual CLI walkthrough](manual-cli.md).
 
 The host needs Python 3.9+ for the test harness, the Docker CLI, and a compiled
 CLI. The first run pulls a small, digest-pinned Python Alpine base image, then
-builds supported and incompatible local fixture images. Registry access is
-needed for that first base pull. Set `ZOVEREIGN_TEST_BINARY`
+builds two compatible image revisions and one incompatible image. Registry
+access is needed for the base pull. Updates use `--local-image`. Set `ZOVEREIGN_TEST_BINARY`
 if your binary is outside `target/debug/zovereign`. Unset `ZOVEREIGN_DOCKER`
 and `FAKE_DOCKER_STATE`; the suite rejects fake-engine overrides.
 
 Coverage uses real Docker adoption (including setup's adoption path), health,
-stats, logs, connection settings, stop/start, intentional stops and durable
-volume identity. Monitor templates preserve Docker executable/configuration
-paths when the service PATH differs from the installing terminal.
+stats, logs, port settings, start/stop, durable volume identity, compatible
+image replacement, acceptance, rollback, incompatible/missing-image rejection,
+and recovery from a seeded interrupted-update journal. Environment overrides,
+read-only mounts and logging options must survive replacement. The monitor
+respects intentional stops. Both native monitor formats are exercised with nondefault
+Docker paths/configuration and a service environment lacking the installing shell's PATH.
+Recovery seeds real stopped
+and renamed containers with a saved update journal.
 Adoption must preserve container identity, mounts and runtime settings, including
 when rejecting an unsupported database version.
 
@@ -267,7 +303,8 @@ It enforces selected application and library rules without enabling every
 opinionated pedantic lint.
 
 The shared API returns `zovereign_core::Error` with source errors and documented
-failure modes. `LogMode` makes streaming behavior explicit. Docker/configuration
-handles are accessed through immutable methods. CLI presentation and polling
-cadence remain in the terminal crate. Service changes use explicit `ServiceScope`
-and `ServiceAction` modes; `record_observation()` records a single read-only probe.
+failure modes. `LogMode` makes streaming behavior explicit. Service changes use
+`ServiceScope` and `ServiceAction`; `record_observation()` records a single
+read-only probe. Docker/configuration handles are accessed through immutable
+methods. CLI presentation and polling cadence remain in the terminal crate.
+Serialized update stages have explicit names and reject unrecognized values.

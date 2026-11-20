@@ -44,6 +44,8 @@ exists there. These image/volume/container names belong only to this walkthrough
 ```sh
 docker --context "$ZV_CONTEXT" build -t zovereign-manual:v1 \
   --build-arg FIXTURE_REVISION=v1 tests/docker_fixture
+docker --context "$ZV_CONTEXT" build -t zovereign-manual:v2 \
+  --build-arg FIXTURE_REVISION=v2 tests/docker_fixture
 docker --context "$ZV_CONTEXT" volume create zovereign-manual-data
 docker --context "$ZV_CONTEXT" run -d --name zovereign-manual \
   --restart unless-stopped --stop-timeout 5 \
@@ -73,19 +75,45 @@ zv --json status
 
 Run `status --watch`, `stats --watch` and `logs --follow` individually, stopping
 each with Ctrl+C. Observe the fixture identity in `--json status`; it should
-survive stop/start while the start counter increases.
+survive starts, replacement and rollback while the start counter increases.
 
 ```sh
 zv stop
-zv agent --once
+zv agent --once --no-update-check
 zv status
 zv start
 zv repair --action restart
 ```
 
-While intentionally stopped, `health` returns a nonzero exit status and restart
-repair refuses recovery. The monitor must leave it stopped. After
-starting, wait until `health` reports ready before continuing.
+While intentionally stopped, `health` returns a nonzero exit status and
+`repair --action restart` refuses recovery. The monitor must leave it stopped.
+After starting/restarting, wait until `health` reports ready before continuing.
+
+## Updates and rollback
+
+```sh
+zv update --check --local-image --image zovereign-manual:v2
+zv update --local-image --image zovereign-manual:v2
+zv health
+zv --json status
+zv update --rollback
+zv health
+zv --json status
+```
+
+Expect revision `v2`, then `v1`, with the same identity. `repair --action rollback`
+is an alternative rollback command while a predecessor is retained. To test
+acceptance, update to `v2` again, wait for readiness, then accept:
+
+```sh
+zv update --local-image --image zovereign-manual:v2
+zv health
+zv update --accept
+```
+
+Acceptance removes the retained predecessor container and keeps the data volume.
+Bare `update` and `--update` use the published Mainnet image; this walkthrough
+uses explicit local fixture images.
 
 ## Monitoring and native startup
 
@@ -93,12 +121,14 @@ starting, wait until `health` reports ready before continuing.
 zv startup disable
 zv startup enable
 zv startup render
-zv agent --once
+zv agent --once --no-update-check
 cat "$ZV_CONFIG/monitor.json"
 ```
 
 The renderer selects the host OS automatically. For continuous monitoring, run
-`zv agent --interval 10` and stop it with Ctrl+C. The monitor only records status and never restarts the managed container.
+`zv agent --interval 10 --no-update-check` and stop it with Ctrl+C. `agent --once`
+also exercises the optional GitHub release check; fixture revisions are not
+evidence of a published release upgrade.
 
 On a Linux systemd host or a macOS login session, optionally test installation:
 
@@ -119,4 +149,4 @@ existing supervisor to run `zv agent`; daily Docker controls still work.
 Stop the manual deployment when finished with `zv stop`. Keep its volume to
 resume later. No global pruning or deployment-volume removal is part of this
 walkthrough. See [the CLI guide](cli.md) for supported platforms, full-runtime
-installation and Mainnet acceptance limits.
+installation, service scope and Mainnet acceptance limits.

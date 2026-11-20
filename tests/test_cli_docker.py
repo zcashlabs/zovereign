@@ -47,7 +47,7 @@ class DockerIntegration(unittest.TestCase):
             raise RuntimeError("The integration fixtures require a Linux Docker engine")
         cls.run_id = uuid.uuid4().hex[:12]
         cls.prefix = f"zovereign-it-{cls.run_id}"
-        cls.images = {version: f"{cls.prefix}:{version}" for version in ("v1", "incompatible")}
+        cls.images = {version: f"{cls.prefix}:{version}" for version in ("v1", "v2", "incompatible")}
         cls.addClassCleanup(cls.cleanup_resources)
         print(f"\nReal Docker context: {cls.context}; fixture prefix: {cls.prefix}", file=sys.stderr)
         for version, image in cls.images.items():
@@ -163,6 +163,9 @@ class DockerIntegration(unittest.TestCase):
             time.sleep(0.25)
         self.fail(f"Fixture readiness timeout: {self.inspect(name)['State']}")
 
+    def update(self):
+        self.cli("update", "--local-image", "--image", self.images["v2"], "--yes")
+        self.wait_ready()
 
     def assert_persistent_identity(self, revision):
         report = self.report()
@@ -196,7 +199,7 @@ class DockerIntegration(unittest.TestCase):
         self.cli("stop")
         self.assertFalse(self.inspect()["State"]["Running"])
         self.assertFalse(self.config()["desired_running"])
-        self.cli("agent", "--once")
+        self.cli("agent", "--once", "--no-update-check")
         self.cli("repair", "--yes", ok=False)
         self.assertFalse(self.inspect()["State"]["Running"])
         self.cli("health", ok=False)
@@ -215,13 +218,34 @@ class DockerIntegration(unittest.TestCase):
                                "PATH": "", "DOCKER_CONFIG": str(Path(self.tmp.name) / "wrong-config"),
                                **monitor_environment(rendered["template"], platform)}
                 result = subprocess.run([str(BINARY), "--config-dir", str(self.config_dir),
-                                         "agent", "--once"],
+                                         "agent", "--once", "--no-update-check"],
                                         env=environment, text=True, capture_output=True, timeout=180)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 report = json.loads((self.config_dir / "monitor.json").read_text())
                 self.assertNotIn("error", report["status"], report)
                 self.assertTrue(report["status"]["runtime"]["test_fixture"])
                 self.assertEqual(self.inspect()["Id"], self.original["Id"])
+
+    def test_compatible_replacement_preserves_volume_and_settings(self):
+        candidate = json.loads(self.cli("update", "--check", "--local-image", "--image", self.images["v2"]).stdout)
+        self.assertTrue(candidate["available"])
+        self.assertTrue(candidate["compatible"])
+        self.assertEqual(self.inspect()["Id"], self.original["Id"])
+        self.update()
+        current = self.inspect()
+        self.assertNotEqual(current["Id"], self.original["Id"])
+        self.assertNotEqual(current["Image"], self.original["Image"])
+        self.assert_persistent_identity("v2")
+        for key in ("RestartPolicy", "PortBindings", "LogConfig"):
+            self.assertEqual(current["HostConfig"][key], self.original["HostConfig"][key], key)
+        self.assertEqual(sorted((m["Name"], m["Destination"], m["RW"]) for m in current["Mounts"]),
+                         sorted((m["Name"], m["Destination"], m["RW"]) for m in self.original["Mounts"]))
+        self.assertIn("DOWNLOAD_WORKERS=5", current["Config"]["Env"])
+        self.assertIn("FIXTURE_CUSTOM=preserve-me", current["Config"]["Env"])
+        self.assertEqual(current["Config"]["Labels"]["org.opencontainers.image.revision"], "v2")
+        retained = self.inspect(self.config()["previous"]["container_id"])
+        self.assertFalse(retained["State"]["Running"])
+        self.assertEqual(retained["HostConfig"]["RestartPolicy"]["Name"], "no")
 
     def test_unsupported_database_adoption_preserves_the_running_container(self):
         name = f"{self.name}-unsupported"
@@ -251,12 +275,81 @@ class DockerIntegration(unittest.TestCase):
         self.assertFalse((config / "installation.json").exists())
         self.assertTrue(self.inspect()["State"]["Running"])
 
+    def test_rollback_restores_original_container_and_data(self):
+        self.update()
+        replacement = self.inspect()["Id"]
+        self.docker("stop", "--time", "5", self.name)
+        self.cli("update", "--accept", "--yes", ok=False)
+        self.assertIsNotNone(self.config()["previous"])
+        self.cli("update", "--rollback", "--yes")
+        self.wait_ready()
+        self.assertEqual(self.inspect()["Id"], self.original["Id"])
+        self.assert_persistent_identity("v1")
+        self.assertFalse(self.inspect(replacement)["State"]["Running"])
+        self.assertEqual(self.inspect(replacement)["HostConfig"]["RestartPolicy"]["Name"], "no")
+        self.assertIsNone(self.config()["previous"])
 
+    def test_accept_removes_only_predecessor_and_keeps_volume(self):
+        # A second live service must stay untouched by management of the target.
+        guard = f"{self.name}-unmanaged"
+        guard_volume = f"{guard}-data"
+        self.docker("volume", "create", "--label", f"{RUN_LABEL}={self.run_id}", guard_volume)
+        self.docker("run", "--detach", "--name", guard, "--label", f"{RUN_LABEL}={self.run_id}",
+                    "--mount", f"type=volume,src={guard_volume},dst=/data", self.images["v1"])
+        self.wait_ready(guard)
+        guard_id = self.inspect(guard)["Id"]
+        guard_identity = self.docker("exec", guard, "cat", "/data/identity.json").stdout
+        self.update()
+        self.cli("update", "--accept", "--yes")
+        self.assertNotEqual(self.docker("container", "inspect", self.original["Id"], check=False).returncode, 0)
+        self.assert_persistent_identity("v2")
+        self.docker("volume", "inspect", self.volume)
+        self.assertIsNone(self.config()["previous"])
+        self.assertEqual(self.inspect(guard)["Id"], guard_id)
+        self.assertTrue(self.inspect(guard)["State"]["Running"])
+        self.assertEqual(self.docker("exec", guard, "cat", "/data/identity.json").stdout, guard_identity)
 
+    def test_incompatible_and_missing_images_never_stop_runtime(self):
+        before = self.inspect()
+        for image in (self.images["incompatible"], f"{self.prefix}:missing"):
+            self.cli("update", "--local-image", "--image", image, "--yes", ok=False)
+            after = self.inspect()
+            self.assertEqual(after["Id"], before["Id"])
+            self.assertTrue(after["State"]["Running"])
+            self.assertEqual(after["State"]["StartedAt"], before["State"]["StartedAt"])
+            self.assertIsNone(self.config()["previous"])
+        self.assert_persistent_identity("v1")
 
+    def test_update_of_stopped_installation_stays_stopped(self):
+        self.cli("stop")
+        self.cli("update", "--local-image", "--image", self.images["v2"], "--yes")
+        self.assertFalse(self.inspect()["State"]["Running"])
+        self.cli("agent", "--once", "--no-update-check")
+        self.assertFalse(self.inspect()["State"]["Running"])
+        self.cli("start")
+        self.wait_ready()
+        self.assert_persistent_identity("v2")
 
-
-
+    def test_repair_recovers_retained_container_from_seeded_journal(self):
+        # Seed the durable old_retained stage with real Docker transitions.
+        # This checks recovery, not the timing of an actual host/process crash.
+        config = self.config()
+        self.docker("stop", "--time", "5", self.name)
+        self.docker("update", "--restart", "no", self.name)
+        self.docker("rename", self.name, f"{self.name}-retained")
+        config["previous"] = {"container_id": self.original["Id"], "image_id": self.original["Image"],
+                              "compatibility": {"zakura": "1.8.7", "database_major": "30", "lightwalletd": "v0.6.0"},
+                              "restart_policy": "unless-stopped"}
+        target = json.loads(self.docker("image", "inspect", self.images["v2"]).stdout)[0]["Id"]
+        config["pending"] = {"stage": "old_retained", "old_id": self.original["Id"],
+                             "new_image": target, "was_running": True}
+        (self.config_dir / "installation.json").write_text(json.dumps(config))
+        self.assertTrue(json.loads(self.cli("doctor").stdout)["pending"])
+        self.cli("repair", "--action", "rollback", "--yes")
+        self.wait_ready()
+        self.assertEqual(self.inspect()["Id"], self.original["Id"])
+        self.assert_persistent_identity("v1")
+        self.assertIsNone(self.config()["pending"])
 
 
 if __name__ == "__main__":
