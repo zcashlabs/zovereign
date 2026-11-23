@@ -107,7 +107,13 @@ gh workflow run release.yml --ref main -f version=v0.1.0
 
 The workflow validates the version, calls the complete native build/test and
 publication pipeline, tags that tested multi-platform image with the version,
-then creates the Git tag and published GitHub Release with installation notes.
+and reuses the CLI test matrix to build and exercise four native release binaries.
+The publish job signs their versioned checksum manifest with Sigstore using the
+release workflow's GitHub OIDC identity. It verifies the signature and digests
+before publishing the manifest, signature bundle, and four binaries
+as release assets. The installer pins the Cosign bootstrap binary digests for
+all four platforms in `scripts/install-cli.sh`. Update those digests together
+with the verifier version and the release workflow's Cosign version.
 Choose a new version for each release. A failed build or test prevents the
 GitHub Release from being created. The release's Docker tag and source tag
 refer to the same commit. The GitHub release archives contain source code;

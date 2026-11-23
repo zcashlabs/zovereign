@@ -23,7 +23,8 @@ const DEFAULT_LOCAL_IMAGE: bool = false;
 
 #[derive(Parser)]
 #[command(
-    version,
+    name = "zovereign",
+    version = option_env!("ZOVEREIGN_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
     about = "Install and manage your own persistent Zcash infrastructure"
 )]
 struct Cli {
