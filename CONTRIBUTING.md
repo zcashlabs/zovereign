@@ -81,6 +81,21 @@ Only the publish job has registry write permission. Publication uses the
 workflow's `GITHUB_TOKEN`; no registry password is required in repository
 secrets. Forks use their own repository namespace.
 
+Every Monday at 00:00 UTC, the same workflow rebuilds `main` with the Docker
+layer cache disabled so the runtime package installation runs again. The build
+uses the upstream versions and digests pinned in the Dockerfile. After both
+native test jobs pass, it publishes `weekly-YYYY-MM-DD` (UTC) and promotes
+that image to `latest` after verifying both platforms in the manifest. The
+weekly build uses its own tag so it can refresh the same source revision
+without overwriting its commit tag. If `main` advances before the scheduled
+publish step, that run skips publication. Numbered releases still use the
+manual Release workflow below.
+
+To rehearse the uncached build and both runtime test suites on your Docker
+engine, run `bash scripts/test-weekly-image.sh`. To select a remote engine,
+pass its named Docker context as the argument. The script reports the tested
+platform and the local `zovereign:weekly-test-*` image tag.
+
 Zakura and grpcurl use pinned multi-platform upstream images. The upstream
 lightwalletd v0.6.0 image is amd64-only, so both architectures compile the same
 commit (`e7436d2adb9ab5828eb8a27de534e16218841fc2`) with Go 1.27.3. The Dockerfile

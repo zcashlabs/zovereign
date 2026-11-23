@@ -1,6 +1,8 @@
 name: Build, test, and publish container
 
 on:
+  schedule:
+    - cron: '0 0 * * 1' # Mondays at 00:00 UTC
   push:
     paths:
       - Dockerfile
@@ -66,6 +68,7 @@ jobs:
           context: .
           platforms: linux/${{ matrix.arch }}
           load: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           tags: zovereign:ci-${{ matrix.arch }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -78,18 +81,16 @@ jobs:
         run: |
           set -Eeuo pipefail
           test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "zovereign:ci-$ARCH")" = "linux/$ARCH"
-          docker run --rm --platform "linux/$ARCH" --entrypoint python3 \
+          docker run --rm -i --platform "linux/$ARCH" --entrypoint python3 \
             -e STACK_MODULE=/opt/zovereign/stack.py \
-            --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/tests,readonly" \
-            "zovereign:ci-$ARCH" /tests/test_stack.py
+            "zovereign:ci-$ARCH" - -v < "$GITHUB_WORKSPACE/tests/test_stack.py"
       - name: Verify structured runtime progress
         env:
           ARCH: ${{ matrix.arch }}
         run: |
-          docker run --rm --platform "linux/$ARCH" --entrypoint python3 \
+          docker run --rm -i --platform "linux/$ARCH" --entrypoint python3 \
             -e STACK_MODULE=/opt/zovereign/stack.py \
-            --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/tests,readonly" \
-            "zovereign:ci-$ARCH" /tests/test_cli_progress.py
+            "zovereign:ci-$ARCH" - -v < "$GITHUB_WORKSPACE/tests/test_cli_progress.py"
       - name: Export tested image
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
@@ -131,18 +132,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish exactly the tested images and assemble the manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="sha-$GITHUB_SHA"
+          if [[ "$GITHUB_EVENT_NAME" == schedule ]]; then
+            # A delayed run or retry can refer to an older main commit.
+            head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+            if [[ "$head" != "$GITHUB_SHA" ]]; then
+              echo 'Skipped weekly publication because main advanced.' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            tag="weekly-$(date -u +%F)"
+          fi
           for arch in amd64 arm64; do
             docker load -i "$RUNNER_TEMP/images/image-$arch.tar"
-            docker tag "zovereign:ci-$arch" "$image:sha-$GITHUB_SHA-$arch"
-            docker push "$image:sha-$GITHUB_SHA-$arch"
+            docker tag "zovereign:ci-$arch" "$image:$tag-$arch"
+            docker push "$image:$tag-$arch"
           done
           docker buildx imagetools create \
-            --tag "$image:sha-$GITHUB_SHA" \
-            "$image:sha-$GITHUB_SHA-amd64" "$image:sha-$GITHUB_SHA-arm64"
-          docker buildx imagetools inspect "$image:sha-$GITHUB_SHA" --raw > "$RUNNER_TEMP/manifest.json"
+            --tag "$image:$tag" "$image:$tag-amd64" "$image:$tag-arm64"
+          docker buildx imagetools inspect "$image:$tag" --raw > "$RUNNER_TEMP/manifest.json"
           python3 - "$RUNNER_TEMP/manifest.json" <<'PYTHON'
           import json, sys
           with open(sys.argv[1]) as source:
@@ -150,6 +162,6 @@ jobs:
           platforms = {(entry['platform']['os'], entry['platform']['architecture']) for entry in manifest['manifests']}
           assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
           PYTHON
-          docker buildx imagetools create --tag "$image:latest" "$image:sha-$GITHUB_SHA"
-          printf 'Published `%s:sha-%s` and `latest` for Linux amd64 and arm64 after both native test jobs passed.\n' \
-            "$image" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          docker buildx imagetools create --tag "$image:latest" "$image:$tag"
+          printf 'Published `%s:%s` and `latest` for Linux amd64 and arm64 from commit `%s`.\n' \
+            "$image" "$tag" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

@@ -57,7 +57,16 @@ docker run -d \
 
 The image is publicly pullable without a registry login. Choose this command
 or Compose for a deployment; both use the same container and volume names.
-Use a `sha-<full-commit>` image tag or digest to pin a specific tested build.
+
+### Docker image releases
+
+Images are published to `ghcr.io/zcashlabs/zovereign`. Relevant pushes to `main`
+produce a `sha-<full-commit>` tag. Every Monday at 00:00 UTC, CI rebuilds
+`main` for Linux AMD64 and ARM64 and tests both images. A successful weekly
+run publishes `weekly-YYYY-MM-DD` and updates `latest` after verifying both
+architectures. Use an image digest to pin an exact build. Maintainers publish
+numbered `vX.Y.Z` tags through the manual release workflow.
+[Image publication and numbered releases](CONTRIBUTING.md#continuous-integration-and-image-publication)
 
 ## Check readiness and connect
 

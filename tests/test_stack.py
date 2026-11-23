@@ -21,7 +21,7 @@ import unittest
 from unittest.mock import patch
 
 
-MODULE = Path(os.environ.get("STACK_MODULE", Path(__file__).resolve().parents[1] / "docker/stack.py"))
+MODULE = Path(os.environ.get("STACK_MODULE") or Path(__file__).resolve().parents[1] / "docker/stack.py")
 spec = importlib.util.spec_from_file_location("stack", MODULE)
 stack = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(stack)
