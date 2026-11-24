@@ -12,8 +12,13 @@ CONTRIBUTING.md, and docs/single-container.md first.
 
 - `crates/zovereign-core`: shared host management; never remove data volumes.
 - `crates/zovereign-cli`: terminal commands and prompts; keep `--json` usable.
+  `src/self_update.rs` compiles in `scripts/install-cli.sh`, so CLI self-update
+  reuses the release signature checks. Keep the installer usable both ways.
 - `docs/cli.md`: host CLI commands, platform limits and pending VM acceptance.
 - `tests/test_cli_workflows.py`: fast workflows against a fake Docker boundary.
+- `tests/test_cli_installer.py` and `tests/test_cli_self_update.py`: installer and
+  self-update against a local release fixture in `tests/cli_test_support.py`.
+  Self-update tests need `ZOVEREIGN_TEST_BINARY` set to a versioned release build.
 - `tests/test_cli_docker.py` and `tests/docker_fixture/`: opt-in real Docker
   lifecycle tests; small HTTP fixtures, no Zcash data. Pin the selected context
   and remove only this test run's labelled resources, never deployment volumes.

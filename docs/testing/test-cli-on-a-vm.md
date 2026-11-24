@@ -23,7 +23,7 @@ SSH destination and use the existing CLI profile that contains `installation.jso
 (
   set -eo pipefail
   git ls-files --cached --others --exclude-standard -z |
-    COPYFILE_DISABLE=1 tar -czf - --null -T - |
+    COPYFILE_DISABLE=1 tar --no-xattrs -czf - --null -T - |
     ssh "${ZV_SERVER:?Set ZV_SERVER to your SSH destination}" 'set -eu
       src=$(mktemp -d "$HOME/zovereign-test.XXXXXXXX")
       cd "$src"
@@ -40,7 +40,7 @@ The script prints `PASS` after these checks succeed:
 
 1. Build the working-tree CLI with the test version `0.0.0` and run the Rust tests.
 2. Read the existing node's status, stats, wallet binding and diagnostics, then verify compact-block service.
-3. Install the real local binary into a temporary home using test download and signer fixtures. Exercise real Docker adoption, stop/start, updates and rollback with disposable labelled containers.
+3. Install the real local binary into a temporary home using test download and signer fixtures. Update a copy of it to a newer fixture release with `zovereign update`, including the runtime hand-off and rejected signatures. Exercise real Docker adoption, stop/start, updates and rollback with disposable labelled containers.
 4. Confirm that the existing node still serves a recent compact block.
 
 The release workflow tests the installer with officially signed assets before publishing the CLI.

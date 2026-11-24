@@ -28,7 +28,7 @@ and run `zovereign --version` to confirm the install.
 
 ### Set up a node and connect your wallet
 
-1. Start Docker on the node host. Run `zovereign check` to check its resources, then `zovereign setup` to start guided installation.
+1. Start Docker on the node host. Run `zovereign check` to check its resources, then `zovereign up` to start guided installation. Later, `zovereign update --search` lists available updates and `zovereign update` updates the CLI and the node.
 2. Run `zovereign status --watch` to follow the snapshot download, restoration, and chain sync. When it shows `ready`, press Ctrl+C to leave the watch.
 3. Run `zovereign health` to confirm the node serves a recent compact block. Run `zovereign connect` to see the wallet endpoint and connection instructions.
 

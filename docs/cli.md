@@ -14,7 +14,7 @@ your Mac, allocate those resources to Docker's Linux VM.
    and open a fresh terminal or SSH session. Until then, [build from source](#build-from-source)
    and use `./target/debug/zovereign` in place of `zovereign` below.
 2. **Start the node.** Run `zovereign check` to check Docker and its resources,
-   then `zovereign setup`. Setup checks free space on the data volume and starts
+   then `zovereign up` (an alias for `zovereign setup`). Setup checks free space on the data volume and starts
    the snapshot download. The first sync can take several hours.
 3. **Wait for readiness.** Run `zovereign status --watch`. When it shows
    `ready`, press Ctrl+C to leave the watch. The node keeps running.
@@ -37,8 +37,9 @@ uses an existing compatible Cosign or downloads a temporary verifier whose
 SHA-256 is pinned in the installer. If needed, it adds `~/.local/bin` to the
 startup configuration for Bash, Zsh, Fish, or a POSIX login shell. Open a new
 session and run `zovereign --version` or run `"$HOME/.local/bin/zovereign" --version`
-immediately. Running the installer again updates the CLI binary. Node setup
-and runtime image updates are separate CLI commands.
+immediately. To update later, run `zovereign update`; see
+[Update the CLI and runtime](#update-the-cli-and-runtime). Running the
+installer again also updates the CLI binary.
 
 ## Build from source
 
@@ -102,8 +103,11 @@ zovereign logs --follow
 zovereign connect
 zovereign doctor
 zovereign repair --action restart
-zovereign update --check
-zovereign update                   # also --update
+zovereign up                       # alias for setup
+zovereign update --search          # alias for --check: CLI and runtime
+zovereign update                   # CLI, then runtime; also --update
+zovereign update --cli-only
+zovereign update --runtime-only
 zovereign update --accept          # after the new runtime is healthy
 zovereign update --rollback
 ```
@@ -218,6 +222,29 @@ lingering for unattended operation; use the explicit system service for a
 suitable Linux server. macOS Docker VMs/login agents generally start after login.
 Non-systemd VMs can use their existing supervisor to run `zovereign agent`.
 
+## Update the CLI and runtime
+
+`zovereign update --search` reports whether a newer CLI release and a newer
+runtime image are available, without changing anything. `zovereign update`
+updates both, asking before each change:
+
+1. If a newer CLI release exists, the CLI verifies and installs it over the
+   running binary, in the same directory. The installer script is compiled into
+   the CLI, so the Sigstore signature and SHA-256 checks that verified this
+   binary also verify its replacement. Nothing is fetched to decide how to verify.
+   A failed check leaves the current binary in place.
+2. The updated CLI then updates the runtime image with
+   `update --runtime-only`, so a CLI release that supports a newer runtime can
+   install it in the same run.
+
+Before setup, `update` updates only the CLI. `--cli-only` and `--runtime-only`
+limit an update or check to one part. An explicit `--image` or `--local-image`
+is runtime-only. Source builds report that self-update is unavailable; rebuild
+them or use the installer. The CLI looks up the latest release through GitHub's
+`releases/latest` redirect, which needs HTTPS access to github.com.
+A CLI update cannot be rolled back with `update --rollback`, which applies to the
+runtime. To return to an earlier CLI, run that release's pinned install command.
+
 ## Update contract and recovery
 
 Updates pull a candidate image, then compare the bundled Zakura version, database
@@ -295,6 +322,9 @@ python3 -m unittest discover -s tests -p 'test_cli_*.py' -v
 The default suite uses a fake Docker boundary and covers argument parsing, adoption, engine identity changes, intentional
 stops, compatibility rejection before shutdown, retained-container rollback,
 interrupted update recovery, TLS/settings preservation and structured progress.
+CLI self-update tests run only with `ZOVEREIGN_TEST_BINARY` set to a versioned
+release build (see CONTRIBUTING.md). They cover signature rejection, in-place
+replacement and the runtime hand-off, using a local release fixture.
 The real-Docker tests below are skipped unless explicitly enabled. When enabled,
 a missing CLI or unavailable engine fails the suite rather than skipping it.
 

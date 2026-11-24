@@ -3,6 +3,7 @@ use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 use std::{
+    ffi::OsString,
     io::{self, IsTerminal, Write},
     path::PathBuf,
     thread,
@@ -13,6 +14,8 @@ use zovereign_core::{
     manager::{epoch, ImageSource, LogMode, DEFAULT_IMAGE},
     startup, Manager, StateStore,
 };
+
+mod self_update;
 
 // Shared by Clap's explicit setup and the command-free first-run path.
 const DEFAULT_CONTAINER: &str = "zovereign";
@@ -49,7 +52,8 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Commands {
-    /// Install the existing combined runtime; downloads begin after checks.
+    /// Install and start the node and lightwalletd; downloads begin after checks.
+    #[command(visible_alias = "up")]
     Setup {
         #[arg(long,default_value=DEFAULT_IMAGE)]
         image: String,
@@ -96,19 +100,29 @@ enum Commands {
         #[arg(long,value_parser=["restart","rollback"],default_value="restart")]
         action: String,
     },
-    /// Pull/check a candidate image, update, roll back, or accept the new runtime.
+    /// Update the CLI and runtime, check for updates, or roll back or accept a runtime update.
+    ///
+    /// With the default image, the CLI updates itself first, then the updated CLI
+    /// updates the runtime. An explicit --image or --local-image updates only the runtime.
     Update {
         #[arg(long,default_value=DEFAULT_IMAGE)]
         image: String,
         /// Use an image already present on the selected Docker engine.
         #[arg(long, conflicts_with_all=["rollback", "accept"])]
         local_image: bool,
-        #[arg(long,conflicts_with_all=["rollback","accept"])]
+        /// Report available CLI and runtime updates without changing anything.
+        #[arg(long, visible_alias = "search", conflicts_with_all=["rollback","accept"])]
         check: bool,
         #[arg(long, conflicts_with = "accept")]
         rollback: bool,
         #[arg(long)]
         accept: bool,
+        /// Check or update only the CLI binary.
+        #[arg(long, conflicts_with_all=["image", "local_image", "rollback", "accept", "runtime_only"])]
+        cli_only: bool,
+        /// Check or update only the runtime image.
+        #[arg(long, conflicts_with_all=["rollback", "accept"])]
+        runtime_only: bool,
     },
     /// Configure Docker restarts or print a host monitor service template.
     Startup {
@@ -310,6 +324,8 @@ fn run(cli: &Cli) -> Result<i32> {
             check: false,
             rollback: false,
             accept: false,
+            cli_only: false,
+            runtime_only: false,
         }
     } else {
         match &cli.command {
@@ -331,6 +347,99 @@ fn run(cli: &Cli) -> Result<i32> {
         }
     };
     dispatch(cli, &m, &command)
+}
+/// Which parts of the installation an update command covers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UpdateScope {
+    /// The CLI first, then the runtime with the updated CLI.
+    Stack,
+    Cli,
+    Runtime,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UpdateAction {
+    Check,
+    Apply,
+}
+fn update(
+    cli: &Cli,
+    m: &Manager,
+    image: &str,
+    source: ImageSource,
+    scope: UpdateScope,
+    action: UpdateAction,
+) -> Result<i32> {
+    let release = match scope {
+        UpdateScope::Runtime => None,
+        UpdateScope::Stack | UpdateScope::Cli => Some(self_update::check()?),
+    };
+    let configured = m.store().load()?.is_some();
+    let mut v = match (scope, action) {
+        (UpdateScope::Cli, _) => json!({}),
+        // Before setup, a stack update has only the CLI to update.
+        (UpdateScope::Stack, _) if !configured => {
+            json!({"installation": "not set up; run 'zovereign up'"})
+        }
+        (_, UpdateAction::Check) => m.updates(image, source)?,
+        (_, UpdateAction::Apply) => {
+            if let Some(tag) = release.as_ref().and_then(self_update::Check::available) {
+                confirm(
+                    &format!("Update the Zovereign CLI to {tag}, then the runtime?"),
+                    cli,
+                )?;
+                let exe = self_update::install(tag)?;
+                if !cli.json {
+                    eprintln!(
+                        "Updated the Zovereign CLI to {tag}. Continuing with the runtime update."
+                    );
+                }
+                return runtime_hand_off(cli, m, &exe, tag);
+            }
+            confirm("Change the runtime? Services may be briefly unavailable; databases will be retained.",cli)?;
+            m.update(image, source)?
+        }
+    };
+    if let Some(release) = release {
+        let mut fields = release.fields();
+        // Reached with an available release only when no runtime update ran.
+        if let (UpdateAction::Apply, Some(tag)) = (action, release.available()) {
+            confirm(&format!("Update the Zovereign CLI to {tag}?"), cli)?;
+            self_update::install(tag)?;
+            fields.insert("cli_update".into(), json!(format!("updated to {tag}")));
+        }
+        if let Some(object) = v.as_object_mut() {
+            object.extend(fields);
+        }
+    }
+    print_value(&v, cli)?;
+    Ok(0)
+}
+/// Let the newly installed CLI update the runtime, since it may support newer runtimes.
+fn runtime_hand_off(cli: &Cli, m: &Manager, exe: &std::path::Path, tag: &str) -> Result<i32> {
+    let mut args: Vec<OsString> = vec!["--config-dir".into(), m.store().root().into()];
+    if let Some(context) = &cli.context {
+        args.extend(["--context".into(), context.into()]);
+    }
+    if cli.json {
+        args.push("--json".into());
+    }
+    if cli.yes {
+        args.push("--yes".into());
+    }
+    args.extend(["update".into(), "--runtime-only".into()]);
+    let output = if cli.json {
+        self_update::Output::Json
+    } else {
+        self_update::Output::Text
+    };
+    let (code, value) = self_update::hand_off(exe, &args, output)?;
+    if let Some(mut value) = value {
+        if let Some(object) = value.as_object_mut() {
+            object.insert("cli_update".into(), json!(format!("updated to {tag}")));
+        }
+        print_value(&value, cli)?;
+    }
+    Ok(code)
 }
 fn dispatch(cli: &Cli, m: &Manager, command: &Commands) -> Result<i32> {
     if !cli.json {
@@ -439,32 +548,36 @@ fn dispatch(cli: &Cli, m: &Manager, command: &Commands) -> Result<i32> {
             check,
             rollback,
             accept,
+            cli_only,
+            runtime_only,
         } => {
-            if *check {
-                m.updates(
-                    image,
-                    if *local_image {
-                        ImageSource::Local
-                    } else {
-                        ImageSource::Registry
-                    },
-                )?
-            } else {
+            if *rollback || *accept {
                 confirm("Change the runtime? Services may be briefly unavailable; databases will be retained.",cli)?;
                 if *rollback {
                     m.rollback()?
-                } else if *accept {
-                    m.accept_update()?
                 } else {
-                    m.update(
-                        image,
-                        if *local_image {
-                            ImageSource::Local
-                        } else {
-                            ImageSource::Registry
-                        },
-                    )?
+                    m.accept_update()?
                 }
+            } else {
+                let scope = if *cli_only {
+                    UpdateScope::Cli
+                } else if *runtime_only || image != DEFAULT_IMAGE || *local_image {
+                    // An explicit image is a runtime-only operation.
+                    UpdateScope::Runtime
+                } else {
+                    UpdateScope::Stack
+                };
+                let source = if *local_image {
+                    ImageSource::Local
+                } else {
+                    ImageSource::Registry
+                };
+                let action = if *check {
+                    UpdateAction::Check
+                } else {
+                    UpdateAction::Apply
+                };
+                return update(cli, m, image, source, scope, action);
             }
         }
         Commands::Startup {

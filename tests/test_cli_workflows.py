@@ -386,7 +386,7 @@ class Workflows(unittest.TestCase):
 
     def test_first_run_and_explicit_setup_use_identical_defaults(self):
         observations = []
-        for command in ((), ('setup',)):
+        for command in ((), ('setup',), ('up',)):
             self.fresh_setup()
             state = self.state()
             state['images']['ghcr.io/zcashlabs/zovereign:latest'] = copy.deepcopy(IMAGE)
@@ -395,5 +395,15 @@ class Workflows(unittest.TestCase):
             observations.append((self.state()['calls'],
                                  json.loads((self.root / 'config/installation.json').read_text())))
         self.assertEqual(observations[0], observations[1])
+        self.assertEqual(observations[0], observations[2])
+
+    def test_update_search_is_check_and_source_builds_skip_cli_updates(self):
+        search = json.loads(self.cli('update', '--search', '--image', 'candidate').stdout)
+        check = json.loads(self.cli('update', '--check', '--image', 'candidate').stdout)
+        self.assertEqual(search, check)
+        self.assertNotIn('cli_update', search)
+        if 'ZOVEREIGN_TEST_BINARY' not in os.environ:  # the default debug build is a source build
+            result = json.loads(self.cli('update', '--cli-only', '--yes').stdout)
+            self.assertEqual(result['cli_update'], 'unavailable for source builds; rerun the installer')
 
 if __name__=='__main__':unittest.main()

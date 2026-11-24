@@ -11,7 +11,15 @@ See [the CLI guide](docs/cli.md) for architecture, commands and platform limits.
 Run `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`,
 `cargo test --workspace --locked`, `cargo build --locked`, then
 `python3 -m unittest discover -s tests -p 'test_cli_*.py' -v`. The default suite
-uses a fake Docker boundary and skips opt-in engine tests. With an existing
+uses a fake Docker boundary and skips opt-in engine tests. Self-update tests need
+a versioned build, because source builds never update themselves:
+
+```bash
+ZOVEREIGN_RELEASE_VERSION=0.0.0 cargo build --release --locked --bin zovereign
+ZOVEREIGN_TEST_BINARY="$PWD/target/release/zovereign" python3 tests/test_cli_self_update.py -v
+```
+
+ With an existing
 Docker engine running, also run:
 
 ```bash

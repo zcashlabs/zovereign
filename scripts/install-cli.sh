@@ -1,6 +1,8 @@
 #!/bin/sh
 # Fetch this bootstrap from the official source repository. Release assets are
 # verified against the identity of that repository's release workflow.
+# The CLI embeds this script for self-update and sets ZOVEREIGN_INSTALL_DIR to the
+# directory of the running binary; the shell PATH is then left unchanged.
 set -eu
 
 repo=https://github.com/zcashlabs/zovereign
@@ -65,6 +67,8 @@ main() {
     esac
     : "${HOME:?Set HOME to your home directory}"
     : "${SHELL:=sh}"
+    bin_dir=${ZOVEREIGN_INSTALL_DIR:-$HOME/.local/bin}
+    case "$bin_dir" in /*) ;; *) fail 'ZOVEREIGN_INSTALL_DIR must be an absolute path.' ;; esac
     command -v curl >/dev/null || fail 'Install curl and retry.'
     command -v sha256sum >/dev/null || command -v shasum >/dev/null || fail 'Install sha256sum or shasum and retry.'
     if [ "$#" -eq 1 ]; then
@@ -107,7 +111,6 @@ main() {
     download "$base/$asset" "$tmp/$asset"
     check_digest "$tmp/$asset" "$expected"
 
-    bin_dir="$HOME/.local/bin"
     mkdir -p "$bin_dir"
     [ ! -d "$bin_dir/zovereign" ] || fail "$bin_dir/zovereign is a directory"
     stage=$(mktemp "$bin_dir/.zovereign.XXXXXXXX")
@@ -116,8 +119,10 @@ main() {
     mv -f "$stage" "$bin_dir/zovereign"
     stage=
     printf 'Installed verified Zovereign %s at %s/zovereign\n' "$version" "$bin_dir"
-    configure_path
-    printf 'Run zovereign to start guided setup.\n'
+    if [ -z "${ZOVEREIGN_INSTALL_DIR:-}" ]; then
+        configure_path
+        printf 'Run zovereign to start guided setup.\n'
+    fi
 }
 
 main "$@"
