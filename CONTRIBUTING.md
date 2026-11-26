@@ -11,7 +11,15 @@ See [the CLI guide](docs/cli.md) for architecture, commands and platform limits.
 Run `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`,
 `cargo test --workspace --locked`, `cargo build --locked`, then
 `python3 -m unittest discover -s tests -p 'test_cli_*.py' -v`. The default suite
-uses a fake Docker boundary and skips opt-in engine tests. With an existing
+uses a fake Docker boundary and skips opt-in engine tests. Self-update tests need
+a versioned build, because source builds never update themselves:
+
+```bash
+ZOVEREIGN_RELEASE_VERSION=0.0.0 cargo build --release --locked --bin zovereign
+ZOVEREIGN_TEST_BINARY="$PWD/target/release/zovereign" python3 tests/test_cli_self_update.py -v
+```
+
+ With an existing
 Docker engine running, also run:
 
 ```bash
@@ -107,7 +115,13 @@ gh workflow run release.yml --ref main -f version=v0.1.0
 
 The workflow validates the version, calls the complete native build/test and
 publication pipeline, tags that tested multi-platform image with the version,
-then creates the Git tag and published GitHub Release with installation notes.
+and reuses the CLI test matrix to build and exercise four native release binaries.
+The publish job signs their versioned checksum manifest with Sigstore using the
+release workflow's GitHub OIDC identity. It verifies the signature and digests
+before publishing the manifest, signature bundle, and four binaries
+as release assets. The installer pins the Cosign bootstrap binary digests for
+all four platforms in `scripts/install-cli.sh`. Update those digests together
+with the verifier version and the release workflow's Cosign version.
 Choose a new version for each release. A failed build or test prevents the
 GitHub Release from being created. The release's Docker tag and source tag
 refer to the same commit. The GitHub release archives contain source code;

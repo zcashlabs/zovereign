@@ -1,8 +1,13 @@
 name: Test and package CLI
 on:
   pull_request:
-    paths: ['Cargo.toml', 'Cargo.lock', 'clippy.toml', 'crates/**', 'tests/test_cli*', 'tests/cli_test_support.py', 'tests/fake_docker.py', 'tests/docker_fixture/**', 'docker/stack.py', '.github/workflows/cli-test.yml']
+    paths: ['Cargo.toml', 'Cargo.lock', 'clippy.toml', 'crates/**', 'tests/test_cli*', 'tests/cli_test_support.py', 'tests/fake_docker.py', 'tests/docker_fixture/**', 'docker/stack.py', 'scripts/install-cli.sh', '.github/workflows/cli-test.yml', '.github/workflows/release.yml']
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
@@ -37,11 +42,28 @@ jobs:
       - run: cargo test --workspace --locked
       - run: cargo build --locked
       - run: python3 -m unittest discover -s tests -p 'test_cli_*.py' -v
+      - name: Test self-update with a versioned build
+        env:
+          ZOVEREIGN_RELEASE_VERSION: 0.0.0
+          CARGO_TARGET_DIR: target/versioned
+        run: |
+          cargo build --locked --bin zovereign
+          ZOVEREIGN_TEST_BINARY="$PWD/target/versioned/debug/zovereign" \
+            python3 tests/test_cli_self_update.py -v
       - name: Build standalone binary
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-        run: cargo build --release --locked --target ${{ matrix.target }}
+          RELEASE_TAG: ${{ inputs.version }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          if [[ -n "$RELEASE_TAG" ]]; then export ZOVEREIGN_RELEASE_VERSION="${RELEASE_TAG#v}"; fi
+          cargo build --release --locked --target "$TARGET"
+          binary="target/$TARGET/release/zovereign"
+          "$binary" --help > /dev/null
+          if [[ -n "$RELEASE_TAG" ]]; then
+            test "$("$binary" --version)" = "zovereign ${RELEASE_TAG#v}"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: zovereign-${{ matrix.target }}

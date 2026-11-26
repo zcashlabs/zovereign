@@ -8,6 +8,43 @@ also want to prove your wallet endpoint serves real Zcash Mainnet blocks.
 | **A. CLI with small test containers** | A macOS or Linux CLI host and a Linux Docker engine on amd64 or arm64. The suite downloads a small fixture base image. | The CLI can adopt a container, start and stop it, preserve data, replace its image, and roll back on your Docker engine. No chain download or 700 GiB disk is required. |
 | **B. Full Mainnet acceptance** | At least 4 CPUs and 15 GiB usable RAM visible to Docker (plan for 16 GiB), and **700 GiB free on the Docker data volume** before setup (plan for a 1 TB SSD). x86_64 guests must expose BMI2 and ADX. Allow several hours and hundreds of GB of network traffic for snapshot downloads. | The node syncs near the Mainnet tip, lightwalletd serves a real compact block, and both databases survive a container restart without another snapshot download. |
 
+## Test the CLI installer on a server that already runs a node
+
+Use the existing CLI checkout on your workstation as the source. The following
+command includes modified and untracked source files. It sends them over SSH to
+a new directory on the test server, along with the pre-commit test script. The
+server needs Bash, Git-compatible build tools (Rust 1.89+, Cargo and a C linker),
+Python 3.9+, jq, and a running Docker engine.
+
+Run this in Bash or Zsh at the root of your working tree. Set `ZV_SERVER` to your
+SSH destination and use the existing CLI profile that contains `installation.json`.
+
+```bash
+(
+  set -eo pipefail
+  git ls-files --cached --others --exclude-standard -z |
+    COPYFILE_DISABLE=1 tar --no-xattrs -czf - --null -T - |
+    ssh "${ZV_SERVER:?Set ZV_SERVER to your SSH destination}" 'set -eu
+      src=$(mktemp -d "$HOME/zovereign-test.XXXXXXXX")
+      cd "$src"
+      tar -xzf -
+      printf "Testing source in %s\n" "$PWD"
+      if [ -f "$HOME/.cargo/env" ]; then . "$HOME/.cargo/env"; fi
+      bash scripts/test-cli-precommit.sh "$HOME/.config/zovereign-e2e"'
+)
+```
+
+If the working tree is already on the Docker host, run
+`bash scripts/test-cli-precommit.sh /path/to/existing/cli-profile` from it.
+The script prints `PASS` after these checks succeed:
+
+1. Build the working-tree CLI with the test version `0.0.0` and run the Rust tests.
+2. Read the existing node's status, stats, wallet binding and diagnostics, then verify compact-block service.
+3. Install the real local binary into a temporary home using test download and signer fixtures. Update a copy of it to a newer fixture release with `zovereign update`, including the runtime hand-off and rejected signatures. Exercise real Docker adoption, stop/start, updates and rollback with disposable labelled containers.
+4. Confirm that the existing node still serves a recent compact block.
+
+The release workflow tests the installer with officially signed assets before publishing the CLI.
+
 ## Choose where to run the commands
 
 The **CLI host** is the machine where you type commands and save reports. The
@@ -17,7 +54,7 @@ for the reboot and failure-recovery exercises.
 
 | Your setup | Where to run the guide | Which Docker resources count |
 | --- | --- | --- |
-| Linux VM on a cloud provider or local hypervisor | Open a shell in the guest, over SSH or its console. Use system Docker or a rootless engine owned by your test account. | CPU and RAM visible to the guest's engine, plus space on its volume. |
+| Linux VM or bare-metal server | Open a shell on the host, over SSH or its console. Use system Docker or a rootless engine owned by your test account. | CPU and RAM visible to Docker and free space on its data volume. |
 | Mac with Docker Desktop or Colima | Open a terminal on the Mac and start the Linux VM you normally use. Select its existing Docker context. | CPU, RAM and disk allocated to that Docker VM. For Mainnet, the Mac also needs enough physical storage for the VM disk to grow. |
 | Linux or Mac workstation managing a remote VM | Stay in the workstation shell and select an existing named Docker context for the remote engine (for example, an SSH context). Build the CLI on the workstation. | CPU, RAM, volume space and published ports on the remote VM. |
 
@@ -35,10 +72,11 @@ plus snapshots and peers for B.
 
 ## Prepare a clean checkout
 
-Build the CLI and the Mainnet image from the same checkout. The commands
-below fetch the head of [PR 3](https://github.com/zcashlabs/zovereign/pull/11)
-and record its exact commit in the reports directory. After the PR merges,
-use `refs/heads/main` to test the integrated branch.
+Build the CLI and the Mainnet image from the same checkout. The commands below
+default to `main` and record the tested commit in the reports directory.
+To test an open PR, first run `export ZV_TEST_REF=refs/pull/NUMBER/head` in this
+shell, replacing `NUMBER` with the number in the PR's URL. To just run the
+prebuilt PR binary, follow the [CLI guide](../cli.md#try-a-pull-request).
 
 For a long SSH session you can open `tmux new-session -A -s zovereign-vm`
 and start Bash there. Use a fresh directory for each engine. The default is
@@ -51,7 +89,7 @@ vm_dir="${ZV_VM_TEST_DIR:-$HOME/zovereign-vm-test}"
 mkdir "$vm_dir" &&
   git init -q "$vm_dir/source" &&
   git -C "$vm_dir/source" remote add origin https://github.com/zcashlabs/zovereign.git &&
-  git -C "$vm_dir/source" fetch --depth=1 origin refs/pull/11/head &&
+  git -C "$vm_dir/source" fetch --depth=1 origin "${ZV_TEST_REF:-refs/heads/main}" &&
   git -C "$vm_dir/source" switch --detach FETCH_HEAD &&
   mkdir "$vm_dir/reports" &&
   git -C "$vm_dir/source" rev-parse HEAD > "$vm_dir/reports/source-commit.txt" &&

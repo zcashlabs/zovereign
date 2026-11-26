@@ -1,12 +1,47 @@
-# Zovereign CLI (development)
+# Zovereign CLI
 
-The Rust workspace adds a host CLI around the existing combined Docker image.
-`zovereign-core` owns configuration, Docker operations and lifecycle decisions;
-`zovereign-cli` owns terminal prompts and presentation. A desktop application can
-call the same library without parsing terminal output. The existing Python
-runtime remains responsible for snapshots and the two node processes.
+## Run your own Zcash mainnet node
 
-## Build and try
+The CLI manages a Docker container that runs Zakura and lightwalletd. For a
+fresh node, Docker needs at least **4 CPUs, 15 GiB of usable RAM, and 700 GiB
+free on its data volume**. Plan for 16 GiB of RAM and a 1 TB SSD. On Intel
+and AMD machines, the CPU must expose BMI2 and ADX. If the node will run on
+a Linux server, SSH into it and follow these steps there. If it will run on
+your Mac, allocate those resources to Docker's Linux VM.
+
+1. **Install the CLI and start Docker.** Once the first signed CLI release is
+   published, use the [one-command installer](../README.md#install-the-cli-on-macos-or-linux)
+   and open a fresh terminal or SSH session. Until then, [build from source](#build-from-source)
+   and use `./target/debug/zovereign` in place of `zovereign` below.
+2. **Start the node.** Run `zovereign check` to check Docker and its resources,
+   then `zovereign up` (an alias for `zovereign setup`). Setup checks free space on the data volume and starts
+   the snapshot download. The first sync can take several hours.
+3. **Wait for readiness.** Run `zovereign status --watch`. When it shows
+   `ready`, press Ctrl+C to leave the watch. The node keeps running.
+4. **Connect your wallet.** Run `zovereign health` to verify that lightwalletd
+   serves a recent block, then `zovereign connect` for the endpoint. The default
+   address is local to the Docker host. For a wallet on another device, use
+   a [trusted tunnel or TLS](single-container.md#serving-remote-clients-with-tls).
+
+## Install a release
+
+Use the [README install command](../README.md#install-the-cli-on-macos-or-linux)
+in Bash or Zsh on your Mac or Linux host. For a specific version, use that
+release's pinned command from its release notes. The downloaded script
+fetches assets from that same version, checks the Sigstore signature on
+`SHA256SUMS` against this project's release workflow on `main`, and checks the
+binary's SHA-256 before replacing `~/.local/bin/zovereign`.
+
+You need HTTPS access, curl, and either sha256sum or shasum. The installer
+uses an existing compatible Cosign or downloads a temporary verifier whose
+SHA-256 is pinned in the installer. If needed, it adds `~/.local/bin` to the
+startup configuration for Bash, Zsh, Fish, or a POSIX login shell. Open a new
+session and run `zovereign --version` or run `"$HOME/.local/bin/zovereign" --version`
+immediately. To update later, run `zovereign update`; see
+[Update the CLI and runtime](#update-the-cli-and-runtime). Running the
+installer again also updates the CLI binary.
+
+## Build from source
 
 Requires Rust 1.89+ to build, and the Docker CLI with access to a running Linux
 Docker engine to operate the stack. Compose, Node.js, Python and Rust are not
@@ -15,12 +50,14 @@ release monitor needs curl. The runtime image contains its own Python.
 
 ```bash
 cargo build --locked
+./target/debug/zovereign --version
 ./target/debug/zovereign --help
 ./target/debug/zovereign check
-./target/debug/zovereign setup
-# Or adopt a container installed through the existing README:
-./target/debug/zovereign adopt --container zovereign
 ```
+
+For a new installation, run `./target/debug/zovereign setup`. To manage a
+compatible container you already run with Docker or Compose, use
+`./target/debug/zovereign adopt --container zovereign`, substituting its name.
 
 With no command, the CLI shows status if configured, or starts guided setup.
 Use `--yes` for unattended setup/adoption. Setup checks engine OS, native CPU
@@ -50,9 +87,8 @@ Mainnet/archive mode and snapshot compatibility before serving compact blocks.
 Adoption preserves the existing container and never refreshes its image.
 
 After setup, `status --watch` follows snapshot progress and live node checkpoints.
-The published image predates structured status: rebuild the image with this
-checkout's `docker/stack.py` before expecting detailed progress. `logs` and
-`health` also work against the older combined image.
+If your runtime image predates structured status, use `logs` and `health` to
+follow startup. Build the image from the same checkout to test detailed progress.
 
 ## Commands
 
@@ -67,8 +103,11 @@ zovereign logs --follow
 zovereign connect
 zovereign doctor
 zovereign repair --action restart
-zovereign update --check
-zovereign update                   # also --update
+zovereign up                       # alias for setup
+zovereign update --search          # alias for --check: CLI and runtime
+zovereign update                   # CLI, then runtime; also --update
+zovereign update --cli-only
+zovereign update --runtime-only
 zovereign update --accept          # after the new runtime is healthy
 zovereign update --rollback
 ```
@@ -183,6 +222,29 @@ lingering for unattended operation; use the explicit system service for a
 suitable Linux server. macOS Docker VMs/login agents generally start after login.
 Non-systemd VMs can use their existing supervisor to run `zovereign agent`.
 
+## Update the CLI and runtime
+
+`zovereign update --search` reports whether a newer CLI release and a newer
+runtime image are available, without changing anything. `zovereign update`
+updates both, asking before each change:
+
+1. If a newer CLI release exists, the CLI verifies and installs it over the
+   running binary, in the same directory. The installer script is compiled into
+   the CLI, so the Sigstore signature and SHA-256 checks that verified this
+   binary also verify its replacement. Nothing is fetched to decide how to verify.
+   A failed check leaves the current binary in place.
+2. The updated CLI then updates the runtime image with
+   `update --runtime-only`, so a CLI release that supports a newer runtime can
+   install it in the same run.
+
+Before setup, `update` updates only the CLI. `--cli-only` and `--runtime-only`
+limit an update or check to one part. An explicit `--image` or `--local-image`
+is runtime-only. Source builds report that self-update is unavailable; rebuild
+them or use the installer. The CLI looks up the latest release through GitHub's
+`releases/latest` redirect, which needs HTTPS access to github.com.
+A CLI update cannot be rolled back with `update --rollback`, which applies to the
+runtime. To return to an earlier CLI, run that release's pinned install command.
+
 ## Update contract and recovery
 
 Updates pull a candidate image, then compare the bundled Zakura version, database
@@ -209,6 +271,39 @@ Updates refuse unsupported custom networks/resource settings/entrypoints before
 stopping services. Compose deployments using a custom network can be adopted
 for daily controls but currently need the documented manual image update.
 
+## Try a pull request
+
+Open the PR's **Checks** tab and follow **Test and package CLI** to the successful
+workflow run for the revision you want to test. While signed in to GitHub,
+download the matching ZIP from the run's **Artifacts** section. Choose the machine
+where you will type the command. An Intel Linux server needs the Linux AMD64
+artifact even if you SSH into it from an Apple Silicon Mac.
+
+| CLI host | Artifact |
+| --- | --- |
+| Linux x86_64 (Intel or AMD) | `zovereign-x86_64-unknown-linux-musl` |
+| Linux ARM64 | `zovereign-aarch64-unknown-linux-musl` |
+| macOS Apple Silicon | `zovereign-aarch64-apple-darwin` |
+| macOS Intel | `zovereign-x86_64-apple-darwin` |
+
+Extract the ZIP into an empty directory on that host. From that directory, run
+
+```sh
+chmod +x ./zovereign
+./zovereign --version
+./zovereign --help
+```
+
+With Docker running, `./zovereign check` checks the engine and host resources.
+For a new node, run `./zovereign setup` and then `./zovereign status --watch`.
+For an existing CLI-managed node, use the account, Docker context and configuration
+directory from its original setup, then run `./zovereign status`, `./zovereign health`
+and `./zovereign stats`. Set `ZOVEREIGN_CONFIG_DIR` if the node uses a custom profile.
+
+PR binaries report the workspace version. The workflow run identifies the exact
+revision. The installer downloads signed binaries from numbered GitHub Releases.
+To build or test the PR yourself, follow the [VM and bare-metal test guide](testing/test-cli-on-a-vm.md#prepare-a-clean-checkout).
+
 ## Verification
 
 Use the [VM test guide](testing/test-cli-on-a-vm.md) from a Linux guest, a Mac with a Docker VM,
@@ -227,6 +322,9 @@ python3 -m unittest discover -s tests -p 'test_cli_*.py' -v
 The default suite uses a fake Docker boundary and covers argument parsing, adoption, engine identity changes, intentional
 stops, compatibility rejection before shutdown, retained-container rollback,
 interrupted update recovery, TLS/settings preservation and structured progress.
+CLI self-update tests run only with `ZOVEREIGN_TEST_BINARY` set to a versioned
+release build (see CONTRIBUTING.md). They cover signature rejection, in-place
+replacement and the runtime hand-off, using a local release fixture.
 The real-Docker tests below are skipped unless explicitly enabled. When enabled,
 a missing CLI or unavailable engine fails the suite rather than skipping it.
 
@@ -297,14 +395,31 @@ full restore. Never use a production volume for failure injection.
 
 ## Rust guidance
 
+The Rust workspace adds a host CLI around the existing combined Docker image.
+`zovereign-core` owns configuration, Docker operations and lifecycle decisions;
+`zovereign-cli` owns terminal prompts and presentation. A desktop application can
+call the same library without parsing terminal output. The existing Python
+runtime remains responsible for snapshots and the two node processes.
+
 The workspace lint policy is adapted from
 [BeautifulRust](https://github.com/morganlinton/BeautifulRust/tree/b9718436d77ee7bcf17cdcb6aa27628feb95d97a).
 It enforces selected application and library rules without enabling every
-opinionated pedantic lint.
+opinionated pedantic lint. The Codex skills are installed outside this repository.
 
-The shared API returns `zovereign_core::Error` with source errors and documented
-failure modes. `LogMode` makes streaming behavior explicit. Service changes use
-`ServiceScope` and `ServiceAction`; `record_observation()` records a single
-read-only probe. Docker/configuration handles are accessed through immutable
-methods. CLI presentation and polling cadence remain in the terminal crate.
-Serialized update stages have explicit names and reject unrecognized values.
+The shared API returns `zovereign_core::Error` and documents failure modes.
+Log streaming uses `LogMode`; service changes use `ServiceScope` and
+`ServiceAction`. The CLI owns polling cadence and calls `record_observation()`
+for one read-only observation. Docker/configuration fields are accessed through
+immutable methods. These replace the initial unpublished API's boolean modes,
+public mutable handles and opaque application error type. The serialized update
+stages retain their existing names, and unrecognized stages are rejected.
+
+Unpublished API changes from this review:
+
+| Before | After | Purpose |
+| --- | --- | --- |
+| `logs(follow: bool, tail)` | `logs(mode: LogMode, tail)` | Makes log-stream behavior explicit. |
+| `startup::install(..., system: bool, remove: bool)` | `startup::configure(..., ServiceScope, ServiceAction)` | Prevents mixing service scope and action flags. |
+| `monitor(interval, once: bool)` | `record_observation()` | Keeps scheduling and looping in the caller. |
+| `anyhow::Result<T>` in shared operations | `zovereign_core::Result<T>` | Gives callers a concrete documented error type. |
+| Mutable `docker`, `store` and `root` fields | `docker()`, `store()` and `root()` accessors | Keeps installation identity encapsulated. |

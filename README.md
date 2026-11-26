@@ -8,11 +8,34 @@ lightwalletd connects to the RPC on your bundled Zakura node.
 
 **[Visit the website](https://zcashlabs.github.io/zovereign/)**
 
-## Host CLI (in development)
+## Install the CLI on macOS or Linux
 
-A Rust CLI and reusable management library are being developed around this image.
-See [CLI setup, commands and current limits](docs/cli.md). Build locally with
-`cargo build --locked`; no CLI binaries have been released by this change.
+To run a fresh mainnet node, Docker needs at least **4 CPUs, 15 GiB of usable RAM,
+and 700 GiB free on its data volume**. If you use a remote server, these resources
+belong on the server. [Run your own node with the CLI](docs/cli.md#run-your-own-zcash-mainnet-node)
+
+**Installing a release?** Once the first signed CLI release is published, run
+the command below on your Mac or in an SSH session on your Linux VM or bare-metal server.
+
+```sh
+installer=$(curl -fsSL --proto '=https' --proto-redir '=https' https://raw.githubusercontent.com/zcashlabs/zovereign/main/scripts/install-cli.sh) && /bin/sh -c "$installer"
+```
+
+The installer verifies the release signature and the checksum for your platform,
+then installs `zovereign` in `~/.local/bin`. Open a fresh terminal or SSH session
+and run `zovereign --version` to confirm the install.
+[Build from source](docs/cli.md#build-from-source)
+
+### Set up a node and connect your wallet
+
+1. Start Docker on the node host. Run `zovereign check` to check its resources, then `zovereign up` to start guided installation. Later, `zovereign update --search` lists available updates and `zovereign update` updates the CLI and the node.
+2. Run `zovereign status --watch` to follow the snapshot download, restoration, and chain sync. When it shows `ready`, press Ctrl+C to leave the watch.
+3. Run `zovereign health` to confirm the node serves a recent compact block. Run `zovereign connect` to see the wallet endpoint and connection instructions.
+
+For everyday use, see the [CLI commands for stats, logs, start/stop, diagnostics, updates, and rollback](docs/cli.md#commands).
+
+**Reviewing a pull request?** You can run its CI binary as soon as the PR checks
+pass. [Run the CLI from a pull request](docs/cli.md#try-a-pull-request)
 
 ## Quick start
 
